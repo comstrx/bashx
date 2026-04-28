@@ -1,0 +1,53 @@
+name: ci
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-bash
+            os: ubuntu-latest
+            bash_path: bash
+
+          - name: macos-bash
+            os: macos-latest
+            bash_path: /opt/homebrew/bin/bash
+
+          - name: windows-gitbash
+            os: windows-latest
+            bash_path: bash
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install modern bash on macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew install bash
+          /opt/homebrew/bin/bash --version
+
+      - name: Make scripts executable
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x tool/parts/builtin/test.sh || true
+        shell: bash
+
+      - name: Run builtin test
+        run: |
+          "${{ matrix.bash_path }}" tool/parts/builtin/test.sh
+        shell: bash
