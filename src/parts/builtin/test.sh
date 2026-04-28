@@ -22,8 +22,8 @@
 
 set -u
 
-PATH_LIB="${1:-${PATH_LIB:-tool/parts/builtin/path.sh}}"
-DIR_LIB="${2:-${DIR_LIB:-tool/parts/builtin/dir.sh}}"
+PATH_LIB="${1:-${PATH_LIB:-src/parts/builtin/path.sh}}"
+DIR_LIB="${2:-${DIR_LIB:-src/parts/builtin/dir.sh}}"
 
 TEST_ROOT=""
 MAIN_PID="${BASHPID:-$$}"
