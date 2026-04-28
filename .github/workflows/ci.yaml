@@ -44,10 +44,10 @@ jobs:
       - name: Make scripts executable
         if: runner.os != 'Windows'
         run: |
-          chmod +x tool/parts/builtin/test.sh || true
+          chmod +x src/parts/builtin/test.sh || true
         shell: bash
 
       - name: Run builtin test
         run: |
-          "${{ matrix.bash_path }}" tool/parts/builtin/test.sh
+          "${{ matrix.bash_path }}" src/parts/builtin/test.sh
         shell: bash
