@@ -233,7 +233,7 @@ file::mktemp () {
 }
 file::mktemp_near () {
 
-    path::mktemp_near "$@"
+    path::mktemp_near file "$@"
 
 }
 

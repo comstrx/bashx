@@ -282,7 +282,7 @@ dir::mktemp () {
 }
 dir::mktemp_near () {
 
-    path::mktemp_near "$@"
+    path::mktemp_near dir "$@"
 
 }
 

@@ -2279,13 +2279,13 @@ path::mktemp_dir () {
 }
 path::mktemp_near () {
 
-    local p="${1:-}" prefix="${2:-}" suffix="${3:-}" dir=""
+    local type="${1:-file}" p="${2:-}" prefix="${3:-}" suffix="${4:-}" dir=""
 
     path::valid "${p}" || return 1
     dir="$(path::dirname "${p}")" || return 1
 
-    if [[ -d "${p}" || "${p}" == */ ]]; then path::mktemp_dir "${prefix}" "${suffix}" "${dir}"
-    else path::mktemp_file "${prefix}" "${suffix}" "${dir}"
+    if [[ "${type}" == "file" ]]; then path::mktemp_file "${prefix}" "${suffix}" "${dir}"
+    else path::mktemp_dir "${prefix}" "${suffix}" "${dir}"
     fi
 
 }
