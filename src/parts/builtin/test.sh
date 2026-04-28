@@ -529,14 +529,17 @@ else
     fail "mktemp creates dir"
 fi
 
-mark dir::mktemp_near
-near_dir="$(dir::mktemp_near "${ROOT}/near-target" 2>/dev/null || true)"
-if [[ -n "${near_dir}" && -d "${near_dir}" && "${near_dir}" == "${ROOT}"/* ]]; then
-    ok "mktemp_near creates dir near target"
-    rm -rf -- "${near_dir}" 2>/dev/null || true
-else
-    fail "mktemp_near creates dir near target"
-fi
+tmp_near="$(dir::mktemp_near "${ROOT}/mut/new-dir" "near." ".d")"
+assert_dir "mktemp_near creates dir near target" "${tmp_near}"
+assert_eq  "mktemp_near parent is target parent" \
+    "$(path::dirname "${ROOT}/mut/new-dir")" \
+    "$(path::dirname "${tmp_near}")"
+
+tmp_near="$(dir::mktemp_near "${ROOT}/mut" "near." ".d")"
+assert_dir "mktemp_near creates dir near existing dir" "${tmp_near}"
+assert_eq  "mktemp_near parent is existing dir parent" \
+    "$(path::dirname "${ROOT}/mut")" \
+    "$(path::dirname "${tmp_near}")"
 
 # -----------------------------------------------------------------------------
 # Links
