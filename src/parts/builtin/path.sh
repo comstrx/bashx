@@ -2282,9 +2282,11 @@ path::mktemp_near () {
     local p="${1:-}" prefix="${2:-}" suffix="${3:-}" dir=""
 
     path::valid "${p}" || return 1
-
     dir="$(path::dirname "${p}")" || return 1
-    path::mktemp_file "${prefix}" "${suffix}" "${dir}"
+
+    if [[ -d "${p}" || "${p}" == */ ]]; then path::mktemp_dir "${prefix}" "${suffix}" "${dir}"
+    else path::mktemp_file "${prefix}" "${suffix}" "${dir}"
+    fi
 
 }
 
@@ -3483,11 +3485,9 @@ path::encrypt_engine () {
     local -n __encrypt_out="${2:-_ENCRYPT_ENGINE}"
 
     __encrypt_out=""
-
     [[ -n "${src}" && -f "${src}" ]] || return 1
 
     LC_ALL=C IFS= read -r -N 64 probe < "${src}" 2>/dev/null || true
-
     [[ "${probe}" == ENCRYPT1$'\n'engine:*$'\n'* ]] || return 1
 
     engine_line="${probe#ENCRYPT1$'\n'}"
@@ -3912,6 +3912,7 @@ path::with_lock () {
     local lock="${1:-}" callback="${2:-}" timeout="${3:-30}" sleep_for="${4:-0.1}" stale="${5:-0}" code=0
 
     path::valid "${lock}" || return 1
+
     [[ -n "${callback}" ]] || return 1
     declare -F "${callback}" >/dev/null 2>&1 || return 1
 
@@ -3923,7 +3924,6 @@ path::with_lock () {
     code=$?
 
     path::unlock "${lock}" || true
-
     return "${code}"
 
 }

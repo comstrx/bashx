@@ -395,8 +395,10 @@ dir::with_lock () {
 
 dir::glob () {
 
-    local p="${1:-}" pattern="${2:-*}" old_nullglob="" old_dotglob="" entry="" base=""
+    local p="${1:-}" pattern="*" old_nullglob="" old_dotglob="" entry="" base=""
     local -a matches=()
+
+    (( $# >= 2 )) && pattern="${2}"
 
     dir::exists "${p}" || return 1
     [[ -n "${pattern}" ]] || return 1
@@ -428,7 +430,9 @@ dir::glob () {
 }
 dir::has_glob () {
 
-    local p="${1:-}" pattern="${2:-}" old_nullglob="" old_dotglob="" entry="" found=1
+    local p="${1:-}" pattern="" old_nullglob="" old_dotglob="" entry="" found=1
+
+    (( $# >= 2 )) && pattern="${2}"
 
     dir::exists "${p}" || return 1
     [[ -n "${pattern}" ]] || return 1
