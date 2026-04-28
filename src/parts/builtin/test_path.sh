@@ -1086,7 +1086,7 @@ assert_eq "parentname root child empty" "" "$(path::parentname "/file" 2>/dev/nu
 
 mark path::mktemp_near
 mkdir -p "${TEST_ROOT}/near"
-near_tmp="$(path::mktemp_near "${TEST_ROOT}/near/base.txt" near .tmp 2>/dev/null || true)"
+near_tmp="$(path::mktemp_near file "${TEST_ROOT}/near/base.txt" near .tmp 2>/dev/null || true)"
 assert_file "mktemp_near creates file" "${near_tmp}"
 case "${near_tmp}" in "${TEST_ROOT}/near"/*) ok "mktemp_near placed near target" ;; *) fail "mktemp_near wrong dir ${near_tmp}" ;; esac
 rm -f -- "${near_tmp}" 2>/dev/null || true

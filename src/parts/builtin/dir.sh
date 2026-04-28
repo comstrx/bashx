@@ -640,18 +640,22 @@ dir::list () {
     (( ${#names[@]} > 0 )) || return 0
 
     case "${sort}" in
-        name|"")
+        ""|name)
+
             if sys::has sort; then printf '%s\n' "${names[@]}" | LC_ALL=C sort
             else printf '%s\n' "${names[@]}"
             fi
-        ;;
-        none)
-            printf '%s\n' "${names[@]}"
+
         ;;
         reverse|desc)
+
             if sys::has sort; then printf '%s\n' "${names[@]}" | LC_ALL=C sort -r
             else printf '%s\n' "${names[@]}"
             fi
+
+        ;;
+        none)
+            printf '%s\n' "${names[@]}"
         ;;
         *)
             return 1
@@ -850,8 +854,10 @@ dir::count_recursive () {
     dir::exists "${p}" || return 1
 
     if sys::has find; then
+
         n="$(find "${p}" -mindepth 1 2>/dev/null | wc -l | tr -d '[:space:]')"
         [[ "${n}" =~ ^[0-9]+$ ]] && { printf '%s\n' "${n}"; return 0; }
+
     fi
 
     while IFS= read -r _; do
