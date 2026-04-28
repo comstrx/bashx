@@ -410,8 +410,8 @@ dir::glob () {
     for entry in "${p%/}"/${pattern}; do
 
         [[ -e "${entry}" || -L "${entry}" ]] || continue
-        base="$(dir::name "${entry}")" || return 1
 
+        base="$(dir::name "${entry}")" || return 1
         [[ -n "${base}" ]] && matches+=( "${base}" )
 
     done
@@ -454,7 +454,11 @@ dir::contains () {
     local parent="${1:-}" name="${2:-}"
 
     dir::exists "${parent}" || return 1
+    path::valid "${name}" || return 1
+
     [[ -n "${name}" ]] || return 1
+    [[ "${name}" != "." && "${name}" != ".." ]] || return 1
+    [[ "${name}" != */* && "${name}" != *\\* ]] || return 1
 
     [[ -e "${parent%/}/${name}" || -L "${parent%/}/${name}" ]]
 
@@ -464,9 +468,13 @@ dir::contains_file () {
     local parent="${1:-}" name="${2:-}"
 
     dir::exists "${parent}" || return 1
-    [[ -n "${name}" ]] || return 1
+    path::valid "${name}" || return 1
 
-    [[ -f "${parent%/}/${name}" ]]
+    [[ -n "${name}" ]] || return 1
+    [[ "${name}" != "." && "${name}" != ".." ]] || return 1
+    [[ "${name}" != */* && "${name}" != *\\* ]] || return 1
+
+    [[ -f "${parent%/}/${name}" && ! -L "${parent%/}/${name}" ]]
 
 }
 dir::contains_dir () {
@@ -474,9 +482,13 @@ dir::contains_dir () {
     local parent="${1:-}" name="${2:-}"
 
     dir::exists "${parent}" || return 1
-    [[ -n "${name}" ]] || return 1
+    path::valid "${name}" || return 1
 
-    [[ -d "${parent%/}/${name}" ]]
+    [[ -n "${name}" ]] || return 1
+    [[ "${name}" != "." && "${name}" != ".." ]] || return 1
+    [[ "${name}" != */* && "${name}" != *\\* ]] || return 1
+
+    [[ -d "${parent%/}/${name}" && ! -L "${parent%/}/${name}" ]]
 
 }
 dir::contains_link () {
@@ -484,7 +496,11 @@ dir::contains_link () {
     local parent="${1:-}" name="${2:-}"
 
     dir::exists "${parent}" || return 1
+    path::valid "${name}" || return 1
+
     [[ -n "${name}" ]] || return 1
+    [[ "${name}" != "." && "${name}" != ".." ]] || return 1
+    [[ "${name}" != */* && "${name}" != *\\* ]] || return 1
 
     [[ -L "${parent%/}/${name}" ]]
 
@@ -494,36 +510,54 @@ dir::contains_hidden () {
     local parent="${1:-}" name="${2:-}"
 
     dir::exists "${parent}" || return 1
+    path::valid "${name}" || return 1
+
     [[ -n "${name}" ]] || return 1
+    [[ "${name}" != "." && "${name}" != ".." ]] || return 1
+    [[ "${name}" != */* && "${name}" != *\\* ]] || return 1
 
     [[ "${name}" == .* ]] || name=".${name}"
     [[ "${name}" != "." && "${name}" != ".." ]] || return 1
+
     [[ -e "${parent%/}/${name}" || -L "${parent%/}/${name}" ]]
 
 }
 
 dir::find () {
 
-    local p="${1:-}" name="${2:-*}" type="${3:-any}" depth="${4:-}" find_type=""
+    local p="${1:-}" name="${2:-*}" type="${3:-any}" depth="${4:-}"
 
     dir::exists "${p}" || return 1
     sys::has find || return 1
 
+    [[ -n "${name}" ]] || return 1
     [[ -n "${depth}" && ! "${depth}" =~ ^[0-9]+$ ]] && return 1
 
     case "${type}" in
-        ""|any) find_type="" ;;
-        file)   find_type="-type f" ;;
-        dir)    find_type="-type d" ;;
-        link)   find_type="-type l" ;;
-        *)      return 1 ;;
+        ""|any)
+            if [[ -n "${depth}" ]]; then find "${p}" -mindepth 1 -maxdepth "${depth}" -name "${name}" 2>/dev/null
+            else find "${p}" -mindepth 1 -name "${name}" 2>/dev/null
+            fi
+        ;;
+        file)
+            if [[ -n "${depth}" ]]; then find "${p}" -mindepth 1 -maxdepth "${depth}" -type f -name "${name}" 2>/dev/null
+            else find "${p}" -mindepth 1 -type f -name "${name}" 2>/dev/null
+            fi
+        ;;
+        dir)
+            if [[ -n "${depth}" ]]; then find "${p}" -mindepth 1 -maxdepth "${depth}" -type d -name "${name}" 2>/dev/null
+            else find "${p}" -mindepth 1 -type d -name "${name}" 2>/dev/null
+            fi
+        ;;
+        link)
+            if [[ -n "${depth}" ]]; then find "${p}" -mindepth 1 -maxdepth "${depth}" -type l -name "${name}" 2>/dev/null
+            else find "${p}" -mindepth 1 -type l -name "${name}" 2>/dev/null
+            fi
+        ;;
+        *)
+            return 1
+        ;;
     esac
-
-    if [[ -n "${depth}" ]]; then
-        find "${p}" -mindepth 1 -maxdepth "${depth}" ${find_type} -name "${name}" 2>/dev/null
-    else
-        find "${p}" -mindepth 1 ${find_type} -name "${name}" 2>/dev/null
-    fi
 
 }
 dir::find_files () {
@@ -593,8 +627,8 @@ dir::list () {
     for entry in "${p%/}"/* "${p%/}"/.[!.]* "${p%/}"/..?*; do
 
         [[ -e "${entry}" || -L "${entry}" ]] || continue
-        base="$(dir::name "${entry}")" || return 1
 
+        base="$(dir::name "${entry}")" || return 1
         [[ -n "${base}" ]] && names+=( "${base}" )
 
     done
@@ -623,13 +657,13 @@ dir::list () {
 }
 dir::list_paths () {
 
-    local p="${1:-}" name=""
+    local p="${1:-}" sort="${2:-name}" name=""
 
     dir::exists "${p}" || return 1
 
     while IFS= read -r name; do
         printf '%s/%s\n' "${p%/}" "${name}"
-    done < <(dir::list "${p}")
+    done < <(dir::list "${p}" "${sort}")
 
 }
 dir::list_files () {
@@ -642,8 +676,8 @@ dir::list_files () {
     for entry in "${p%/}"/* "${p%/}"/.[!.]* "${p%/}"/..?*; do
 
         [[ -f "${entry}" && ! -L "${entry}" ]] || continue
-        base="$(dir::name "${entry}")" || return 1
 
+        base="$(dir::name "${entry}")" || return 1
         [[ -n "${base}" ]] && names+=( "${base}" )
 
     done
@@ -665,8 +699,8 @@ dir::list_dirs () {
     for entry in "${p%/}"/* "${p%/}"/.[!.]* "${p%/}"/..?*; do
 
         [[ -d "${entry}" && ! -L "${entry}" ]] || continue
-        base="$(dir::name "${entry}")" || return 1
 
+        base="$(dir::name "${entry}")" || return 1
         [[ -n "${base}" ]] && names+=( "${base}" )
 
     done
@@ -688,8 +722,8 @@ dir::list_links () {
     for entry in "${p%/}"/* "${p%/}"/.[!.]* "${p%/}"/..?*; do
 
         [[ -L "${entry}" ]] || continue
-        base="$(dir::name "${entry}")" || return 1
 
+        base="$(dir::name "${entry}")" || return 1
         [[ -n "${base}" ]] && names+=( "${base}" )
 
     done
@@ -711,8 +745,8 @@ dir::list_hidden () {
     for entry in "${p%/}"/.[!.]* "${p%/}"/..?*; do
 
         [[ -e "${entry}" || -L "${entry}" ]] || continue
-        base="$(dir::name "${entry}")" || return 1
 
+        base="$(dir::name "${entry}")" || return 1
         [[ -n "${base}" ]] && names+=( "${base}" )
 
     done
@@ -764,8 +798,10 @@ dir::count_dirs () {
     dir::exists "${p}" || return 1
 
     for entry in "${p%/}"/* "${p%/}"/.[!.]* "${p%/}"/..?*; do
+
         [[ -d "${entry}" && ! -L "${entry}" ]] || continue
         n=$(( n + 1 ))
+
     done
 
     printf '%s\n' "${n}"
@@ -778,8 +814,10 @@ dir::count_links () {
     dir::exists "${p}" || return 1
 
     for entry in "${p%/}"/* "${p%/}"/.[!.]* "${p%/}"/..?*; do
+
         [[ -L "${entry}" ]] || continue
         n=$(( n + 1 ))
+
     done
 
     printf '%s\n' "${n}"
@@ -792,8 +830,10 @@ dir::count_hidden () {
     dir::exists "${p}" || return 1
 
     for entry in "${p%/}"/.[!.]* "${p%/}"/..?*; do
+
         [[ -e "${entry}" || -L "${entry}" ]] || continue
         n=$(( n + 1 ))
+
     done
 
     printf '%s\n' "${n}"
