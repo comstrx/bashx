@@ -529,8 +529,13 @@ else
     fail "mktemp creates dir"
 fi
 
+mkdir -p -- "${TEST_ROOT}/mut"
+
+mark dir::mktemp_near
 tmp_near="$(dir::mktemp_near "${TEST_ROOT}/mut/new-dir" "near." ".d")"
+
 assert_dir "mktemp_near creates dir near target" "${tmp_near}"
+
 assert_eq "mktemp_near parent is target parent" \
     "$(path::dirname "${TEST_ROOT}/mut/new-dir")" \
     "$(path::dirname "${tmp_near}")"
