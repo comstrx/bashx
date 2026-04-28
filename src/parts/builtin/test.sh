@@ -529,7 +529,13 @@ else
     fail "mktemp creates dir"
 fi
 
-tmp_near="$(dir::mktemp_near "${TEST_ROOT}/mut/new-dir" "near." "d")"
+mark dir::mktemp_near
+
+mkdir -p -- "${TEST_ROOT}/mut" || fail "mktemp_near setup parent"
+
+tmp_near="$(dir::mktemp_near "${TEST_ROOT}/mut/new-dir" "near" "d" 2>/dev/null || true)"
+
+[[ -n "${tmp_near}" ]] || fail "mktemp_near returned empty"
 
 assert_dir "mktemp_near creates dir near target" "${tmp_near}"
 
