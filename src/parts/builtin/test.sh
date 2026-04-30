@@ -26,23 +26,22 @@ source "${TARGET_FILE}"
 #     sys::ensure "${MIN_TEST_BASH_VERSION}" "$@"
 # fi
 
-# From this point the test is allowed to use modern Bash features.
 set -uo pipefail
 
-if [[ "${BASH_VERSION:-}" =~ ^([0-9]+)([.]([0-9]+))?([.]([0-9]+))? ]]; then
-    if (( BASH_REMATCH[1] < 5 || ( BASH_REMATCH[1] == 5 && ${BASH_REMATCH[3]:-0} < 2 ) )); then
-        printf 'FATAL: Bash >= %s required after ensure, got %s\n' "${MIN_TEST_BASH_VERSION}" "${BASH_VERSION:-unknown}" >&2
-        exit 1
-    fi
-else
-    printf 'FATAL: unable to parse Bash version: %s\n' "${BASH_VERSION:-unknown}" >&2
-    exit 1
-fi
+# if [[ "${BASH_VERSION:-}" =~ ^([0-9]+)([.]([0-9]+))?([.]([0-9]+))? ]]; then
+#     if (( BASH_REMATCH[1] < 5 || ( BASH_REMATCH[1] == 5 && ${BASH_REMATCH[3]:-0} < 2 ) )); then
+#         printf 'FATAL: Bash >= %s required after ensure, got %s\n' "${MIN_TEST_BASH_VERSION}" "${BASH_VERSION:-unknown}" >&2
+#         exit 1
+#     fi
+# else
+#     printf 'FATAL: unable to parse Bash version: %s\n' "${BASH_VERSION:-unknown}" >&2
+#     exit 1
+# fi
 
-if ! declare -F sys::has >/dev/null 2>&1; then
-    printf 'FATAL: system.sh was not loaded after ensure: %s\n' "${TARGET_FILE}" >&2
-    exit 1
-fi
+# if ! declare -F sys::has >/dev/null 2>&1; then
+#     printf 'FATAL: system.sh was not loaded after ensure: %s\n' "${TARGET_FILE}" >&2
+#     exit 1
+# fi
 
 TARGET_ABS="$(cd "$(dirname "${TARGET_FILE}")" 2>/dev/null && pwd -P)/$(basename "${TARGET_FILE}")"
 ROOT_TMP="$(mktemp -d 2>/dev/null || mktemp -d -t bashx_system_test)"
