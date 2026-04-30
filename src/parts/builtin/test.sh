@@ -40,7 +40,9 @@ print sys::name
 print sys::runtime
 print sys::kernel
 print sys::distro
-print sys::manager
+print sys::pkg_manager
+print sys::svc_manager
+print sys::fw_manager
 print sys::arch
 print sys::version
 
@@ -55,6 +57,13 @@ print sys::path_dirs
 printf '\n[identity]\n'
 print sys::hostname
 print sys::username
+print sys::pid
+print sys::ppid
+print sys::umask
+print sys::locale
+print sys::timezone
+print sys::proxy
+print sys::ip
 
 printf '\n[ci/runtime flags]\n'
 print sys::ci_name

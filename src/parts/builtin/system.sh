@@ -4,18 +4,6 @@ sys::has () {
     command -v "${1:-}" >/dev/null 2>&1
 
 }
-sys::shell () {
-
-    local v=""
-    v="${BASH:-}"
-
-    [[ -n "${v}" ]] || v="${0:-}"
-    [[ -n "${v}" ]] || return 1
-
-    printf '%s\n' "${v}"
-
-}
-
 sys::is_linux () {
 
     local s=""
@@ -361,122 +349,107 @@ sys::can_sudo () {
 
 }
 
-sys::which () {
+sys::pkg_manager () {
 
-    local bin="${1:-}" v=""
+    if sys::is_linux; then
 
-    [[ -n "${bin}" ]] || return 1
-    [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
+        sys::has apt-get      && { printf '%s\n' "apt";     return 0; }
+        sys::has apk          && { printf '%s\n' "apk";     return 0; }
+        sys::has dnf          && { printf '%s\n' "dnf";     return 0; }
+        sys::has yum          && { printf '%s\n' "yum";     return 0; }
+        sys::has pacman       && { printf '%s\n' "pacman";  return 0; }
+        sys::has zypper       && { printf '%s\n' "zypper";  return 0; }
+        sys::has xbps-install && { printf '%s\n' "xbps";    return 0; }
+        sys::has nix          && { printf '%s\n' "nix";     return 0; }
+        sys::has rpm          && { printf '%s\n' "rpm";     return 0; }
+        sys::has brew         && { printf '%s\n' "brew"; return 0; }
 
-    v="$(command -v -- "${bin}" 2>/dev/null || true)"
-    [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+        printf '%s\n' "unknown"
+        return 1
 
+    fi
+    if sys::is_macos; then
+
+        sys::has brew && { printf '%s\n' "brew"; return 0; }
+        sys::has port && { printf '%s\n' "port"; return 0; }
+
+        printf '%s\n' "unknown"
+        return 1
+
+    fi
     if sys::is_windows; then
-        for v in ".exe" ".cmd" ".bat" ".ps1"; do
-            command -v -- "${bin}${v}" >/dev/null 2>&1 || continue
-            command -v -- "${bin}${v}" 2>/dev/null
+
+        if sys::is_msys && sys::has pacman; then
+            printf '%s\n' "pacman"
             return 0
-        done
+        fi
+
+        sys::has winget && { printf '%s\n' "winget"; return 0; }
+        sys::has scoop  && { printf '%s\n' "scoop";  return 0; }
+        sys::has choco  && { printf '%s\n' "choco";  return 0; }
+        sys::has pacman && { printf '%s\n' "pacman"; return 0; }
+
+        printf '%s\n' "unknown"
+        return 1
+
     fi
 
+    printf '%s\n' "unknown"
     return 1
 
 }
-sys::which_all () {
+sys::svc_manager () {
 
-    local bin="${1:-}" path_value="${PATH:-}" sep="" dir="" entry="" ext="" found=1
-    local -a dirs=() exts=()
+    if sys::is_linux; then
 
-    [[ -n "${bin}" ]] || return 1
-    [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
+        sys::has systemctl  && [[ -d /run/systemd/system || -d /sys/fs/cgroup/system.slice ]] && { printf '%s\n' "systemd"; return 0; }
+        sys::has rc-service && { printf '%s\n' "openrc"; return 0; }
+        sys::has service    && { printf '%s\n' "sysvinit"; return 0; }
+        sys::has sv         && { printf '%s\n' "runit"; return 0; }
+        sys::has s6-rc      && { printf '%s\n' "s6"; return 0; }
 
-    case "${path_value}" in
-        *";"*) sep=";" ;;
-        *)     sep=":" ;;
-    esac
+    fi
+    if sys::is_macos; then
 
-    IFS="${sep}" read -r -a dirs <<< "${path_value}"
+        sys::has launchctl && { printf '%s\n' "launchd"; return 0; }
 
-    if sys::is_windows; then exts=( "" ".exe" ".cmd" ".bat" ".ps1" )
-    else exts=( "" )
+    fi
+    if sys::is_windows; then
+
+        { sys::has sc.exe || sys::has sc; } && { printf '%s\n' "sc"; return 0; }
+        sys::has powershell.exe && { printf '%s\n' "powershell"; return 0; }
+
     fi
 
-    for dir in "${dirs[@]}"; do
-
-        [[ -n "${dir}" ]] || continue
-
-        for ext in "${exts[@]}"; do
-
-            entry="${dir%/}/${bin}${ext}"
-            [[ -f "${entry}" && -x "${entry}" ]] || continue
-
-            printf '%s\n' "${entry}"
-            found=0
-
-        done
-
-    done
-
-    return "${found}"
+    printf '%s\n' "none"
+    return 1
 
 }
-sys::path_sep () {
+sys::fw_manager () {
 
-    if sys::is_windows; then printf '%s\n' ";"
-    else printf '%s\n' ":"
+    if sys::is_linux; then
+
+        sys::has ufw          && { printf '%s\n' "ufw";       return 0; }
+        sys::has firewall-cmd && { printf '%s\n' "firewalld"; return 0; }
+        sys::has nft          && { printf '%s\n' "nftables";  return 0; }
+        sys::has iptables     && { printf '%s\n' "iptables";  return 0; }
+        sys::has pfctl        && { printf '%s\n' "pf";        return 0; }
+
+    fi
+    if sys::is_macos; then
+
+        sys::has pfctl && { printf '%s\n' "pf"; return 0; }
+
+    fi
+    if sys::is_windows; then
+
+        sys::has powershell.exe && { printf '%s\n' "windows-firewall"; return 0; }
+        sys::has netsh          && { printf '%s\n' "netsh"; return 0; }
+
     fi
 
-}
-sys::line_sep () {
-
-    if sys::is_windows; then printf '%s\n' "crlf"
-    else printf '%s\n' "lf"
-    fi
-
-}
-sys::exe_suffix () {
-
-    if sys::is_windows; then printf '%s\n' ".exe"
-    else printf '%s\n' ""
-    fi
-
-}
-sys::lib_suffix () {
-
-    if sys::is_windows; then printf '%s\n' ".dll"
-    elif sys::is_macos; then printf '%s\n' ".dylib"
-    else printf '%s\n' ".so"
-    fi
-
-}
-sys::path_name () {
-
-    if sys::is_windows; then printf '%s\n' "Path"
-    else printf '%s\n' "PATH"
-    fi
-
-}
-sys::path_dirs () {
-
-    local path_value="${PATH:-}" sep="" part=""
-
-    [[ -n "${path_value}" ]] || return 0
-
-    case "${path_value}" in
-        *";"*) sep=";" ;;
-        *)     sep=":" ;;
-    esac
-
-    while [[ "${path_value}" == *"${sep}"* ]]; do
-
-        part="${path_value%%"${sep}"*}"
-        path_value="${path_value#*"${sep}"}"
-
-        [[ -n "${part}" ]] && printf '%s\n' "${part}"
-
-    done
-
-    [[ -n "${path_value}" ]] && printf '%s\n' "${path_value}"
+    printf '%s\n' "none"
+    return 1
 
 }
 
@@ -611,55 +584,7 @@ sys::distro () {
     return 1
 
 }
-sys::manager () {
 
-    if sys::is_linux; then
-
-        sys::has apt-get      && { printf '%s\n' "apt";     return 0; }
-        sys::has apk          && { printf '%s\n' "apk";     return 0; }
-        sys::has dnf          && { printf '%s\n' "dnf";     return 0; }
-        sys::has yum          && { printf '%s\n' "yum";     return 0; }
-        sys::has pacman       && { printf '%s\n' "pacman";  return 0; }
-        sys::has zypper       && { printf '%s\n' "zypper";  return 0; }
-        sys::has xbps-install && { printf '%s\n' "xbps";    return 0; }
-        sys::has nix          && { printf '%s\n' "nix";     return 0; }
-        sys::has rpm          && { printf '%s\n' "rpm";     return 0; }
-        sys::has brew         && { printf '%s\n' "brew"; return 0; }
-
-        printf '%s\n' "unknown"
-        return 1
-
-    fi
-    if sys::is_macos; then
-
-        sys::has brew && { printf '%s\n' "brew"; return 0; }
-        sys::has port && { printf '%s\n' "port"; return 0; }
-
-        printf '%s\n' "unknown"
-        return 1
-
-    fi
-    if sys::is_windows; then
-
-        if sys::is_msys && sys::has pacman; then
-            printf '%s\n' "pacman"
-            return 0
-        fi
-
-        sys::has winget && { printf '%s\n' "winget"; return 0; }
-        sys::has scoop  && { printf '%s\n' "scoop";  return 0; }
-        sys::has choco  && { printf '%s\n' "choco";  return 0; }
-        sys::has pacman && { printf '%s\n' "pacman"; return 0; }
-
-        printf '%s\n' "unknown"
-        return 1
-
-    fi
-
-    printf '%s\n' "unknown"
-    return 1
-
-}
 sys::arch () {
 
     local v="" lower=""
@@ -721,7 +646,6 @@ sys::version () {
     return 1
 
 }
-
 sys::uptime () {
 
     local v=""
@@ -779,6 +703,133 @@ sys::loadavg () {
     return 1
 
 }
+sys::umask () {
+
+    local v=""
+
+    v="$(umask 2>/dev/null || true)"
+    [[ -n "${v}" ]] || return 1
+
+    printf '%s\n' "${v}"
+
+}
+
+sys::shell () {
+
+    local v=""
+    v="${BASH:-}"
+
+    [[ -n "${v}" ]] || v="${0:-}"
+    [[ -n "${v}" ]] || return 1
+
+    printf '%s\n' "${v}"
+
+}
+sys::pid () {
+
+    printf '%s\n' "$$"
+
+}
+sys::ppid () {
+
+    printf '%s\n' "${PPID:-0}"
+
+}
+sys::proxy () {
+
+    local k="" found=1
+
+    for k in HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; do
+        [[ -n "${!k:-}" ]] || continue
+        printf '%s=%s\n' "${k}" "${!k}"
+        found=0
+    done
+
+    return "${found}"
+
+}
+sys::ip () {
+
+    local v=""
+
+    if sys::has hostname; then
+
+        v="$(hostname -I 2>/dev/null || true)"
+        v="${v#"${v%%[![:space:]]*}"}"
+        v="${v%"${v##*[![:space:]]}"}"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+    if sys::has ip; then
+
+        v="$(ip -o -4 addr show scope global 2>/dev/null | awk '{ sub(/\/.*/, "", $4); print $4 }')"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+    if sys::has ifconfig; then
+
+        v="$(ifconfig 2>/dev/null | awk '/inet / && $2 != "127.0.0.1" { print $2 }')"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+    if sys::is_windows && sys::has powershell.exe; then
+
+        v="$(powershell.exe -NoProfile -NonInteractive -Command "Get-NetIPAddress -AddressFamily IPv4 | Where-Object { \$_.IPAddress -notlike '127.*' -and \$_.PrefixOrigin -ne 'WellKnown' } | Select-Object -ExpandProperty IPAddress" 2>/dev/null | tr -d '\r')"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+
+    return 1
+
+}
+sys::locale () {
+
+    local v=""
+
+    v="${LC_ALL:-${LC_CTYPE:-${LANG:-}}}"
+    [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    if sys::has locale; then
+        v="$(locale 2>/dev/null | sed -n 's/^LANG=//p' | head -n 1)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+    if sys::is_windows && sys::has powershell.exe; then
+        v="$(powershell.exe -NoProfile -NonInteractive -Command "(Get-Culture).Name" 2>/dev/null | tr -d '\r' | head -n 1)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+
+    return 1
+
+}
+sys::timezone () {
+
+    local v=""
+
+    if [[ -n "${TZ:-}" ]]; then
+        printf '%s\n' "${TZ}"
+        return 0
+    fi
+    if sys::has timedatectl; then
+        v="$(timedatectl show -p Timezone --value 2>/dev/null || true)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+    if [[ -L /etc/localtime ]] && sys::has readlink; then
+        v="$(readlink /etc/localtime 2>/dev/null || true)"
+        v="${v#*/zoneinfo/}"
+        [[ -n "${v}" && "${v}" != /etc/localtime ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+    if sys::is_macos && sys::has systemsetup; then
+        v="$(systemsetup -gettimezone 2>/dev/null | sed 's/^Time Zone: //' | head -n 1)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+    if sys::is_windows && sys::has powershell.exe; then
+        v="$(powershell.exe -NoProfile -NonInteractive -Command "(Get-TimeZone).Id" 2>/dev/null | tr -d '\r' | head -n 1)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+
+    return 1
+
+}
 sys::hostname () {
 
     local v=""
@@ -819,6 +870,126 @@ sys::username () {
 
     [[ -n "${v}" ]] || return 1
     printf '%s\n' "${v}"
+
+}
+
+sys::path_sep () {
+
+    if sys::is_windows; then printf '%s\n' ";"
+    else printf '%s\n' ":"
+    fi
+
+}
+sys::line_sep () {
+
+    if sys::is_windows; then printf '%s\n' "crlf"
+    else printf '%s\n' "lf"
+    fi
+
+}
+sys::exe_suffix () {
+
+    if sys::is_windows; then printf '%s\n' ".exe"
+    else printf '%s\n' ""
+    fi
+
+}
+sys::lib_suffix () {
+
+    if sys::is_windows; then printf '%s\n' ".dll"
+    elif sys::is_macos; then printf '%s\n' ".dylib"
+    else printf '%s\n' ".so"
+    fi
+
+}
+sys::path_name () {
+
+    if sys::is_windows; then printf '%s\n' "Path"
+    else printf '%s\n' "PATH"
+    fi
+
+}
+sys::path_dirs () {
+
+    local path_value="${PATH:-}" sep="" part=""
+
+    [[ -n "${path_value}" ]] || return 0
+
+    case "${path_value}" in
+        *";"*) sep=";" ;;
+        *)     sep=":" ;;
+    esac
+
+    while [[ "${path_value}" == *"${sep}"* ]]; do
+
+        part="${path_value%%"${sep}"*}"
+        path_value="${path_value#*"${sep}"}"
+
+        [[ -n "${part}" ]] && printf '%s\n' "${part}"
+
+    done
+
+    [[ -n "${path_value}" ]] && printf '%s\n' "${path_value}"
+
+}
+
+sys::which () {
+
+    local bin="${1:-}" v=""
+
+    [[ -n "${bin}" ]] || return 1
+    [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
+
+    v="$(command -v -- "${bin}" 2>/dev/null || true)"
+    [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    if sys::is_windows; then
+        for v in ".exe" ".cmd" ".bat" ".ps1"; do
+            command -v -- "${bin}${v}" >/dev/null 2>&1 || continue
+            command -v -- "${bin}${v}" 2>/dev/null
+            return 0
+        done
+    fi
+
+    return 1
+
+}
+sys::which_all () {
+
+    local bin="${1:-}" path_value="${PATH:-}" sep="" dir="" entry="" ext="" found=1
+    local -a dirs=() exts=()
+
+    [[ -n "${bin}" ]] || return 1
+    [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
+
+    case "${path_value}" in
+        *";"*) sep=";" ;;
+        *)     sep=":" ;;
+    esac
+
+    IFS="${sep}" read -r -a dirs <<< "${path_value}"
+
+    if sys::is_windows; then exts=( "" ".exe" ".cmd" ".bat" ".ps1" )
+    else exts=( "" )
+    fi
+
+    for dir in "${dirs[@]}"; do
+
+        [[ -n "${dir}" ]] || continue
+
+        for ext in "${exts[@]}"; do
+
+            entry="${dir%/}/${bin}${ext}"
+            [[ -f "${entry}" && -x "${entry}" ]] || continue
+
+            printf '%s\n' "${entry}"
+            found=0
+
+        done
+
+    done
+
+    return "${found}"
 
 }
 sys::open () {
@@ -1482,7 +1653,7 @@ sys::install_bash () {
 
     local manager=""
 
-    manager="$(sys::manager 2>/dev/null || true)"
+    manager="$(sys::pkg_manager 2>/dev/null || true)"
     [[ -n "${manager}" && "${manager}" != "unknown" ]] || return 1
 
     case "${manager}" in
@@ -1570,7 +1741,6 @@ sys::ensure_bash () {
     [[ -n "${found}" ]] || exit 1
 
     script="${0:-}"
-
     [[ -z "${script}" || ! -f "${script}" ]] && script="${BASH_SOURCE[0]:-${0:-}}"
     [[ -n "${script}" && -f "${script}" ]] || exit 1
 
