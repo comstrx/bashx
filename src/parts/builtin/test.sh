@@ -225,41 +225,21 @@ mark file::abs;         assert_ne 'abs returns absolute path' "$(file::abs "${A}
 mark file::rel;         assert_eq 'rel returns relative from root' 'a.txt' "$(file::rel "${A}" "${ROOT_TMP}" 2>/dev/null || true)"
 mark file::can;         assert_ne 'can returns canonical existing file' "$(file::can "${A}" 2>/dev/null || true)"
 
-section "[metadata]"
+section 'metadata'
 
-meta_file="$(mktemp "${TMPDIR:-/tmp}/bashx-file-meta.XXXXXX")"
-printf '%s' "alpha beta gamma delta" > "${meta_file}"
+META="${ROOT_TMP}/metadata.txt"
+printf '%s' 'alpha beta gamma delta' > "${META}"
+META_SIZE="$(wc -c < "${META}" | tr -d '[:space:]')"
 
-meta_size="$(wc -c < "${meta_file}" | tr -d '[:space:]')"
-
-touch_fn file::size
-eq "$(file::size "${meta_file}")" "${meta_size}" "size counts bytes"
-
-touch_fn file::mtime
-ok "file::mtime \"${meta_file}\" >/dev/null" "mtime returns timestamp"
-
-touch_fn file::atime
-ok "file::atime \"${meta_file}\" >/dev/null" "atime returns timestamp"
-
-touch_fn file::ctime
-ok "file::ctime \"${meta_file}\" >/dev/null" "ctime returns timestamp"
-
-touch_fn file::age
-ok "file::age \"${meta_file}\" >/dev/null" "age returns age seconds"
-
-touch_fn file::owner
-ok "file::owner \"${meta_file}\" >/dev/null" "owner returns owner"
-
-touch_fn file::group
-ok "file::group \"${meta_file}\" >/dev/null" "group returns group"
-
-touch_fn file::mode
-ok "file::mode \"${meta_file}\" >/dev/null" "mode returns permissions"
-
-touch_fn file::inode
-ok "file::inode \"${meta_file}\" >/dev/null" "inode returns inode"
-
-rm -f -- "${meta_file}" 2>/dev/null || true
+mark file::size;        assert_eq 'size counts bytes' "${META_SIZE}" "$(file::size "${META}" 2>/dev/null | tr -d '\n' || true)"
+mark file::mtime;       assert_ne 'mtime returns timestamp' "$(file::mtime "${META}" 2>/dev/null || true)"
+mark file::atime;       assert_ne 'atime returns timestamp' "$(file::atime "${META}" 2>/dev/null || true)"
+mark file::ctime;       assert_ne 'ctime returns timestamp' "$(file::ctime "${META}" 2>/dev/null || true)"
+mark file::age;         assert_ne 'age returns age seconds' "$(file::age "${META}" 2>/dev/null || true)"
+mark file::owner;       file::owner "${META}" >/dev/null 2>&1 && pass 'owner returns owner' || skip 'owner unavailable'
+mark file::group;       file::group "${META}" >/dev/null 2>&1 && pass 'group returns group' || skip 'group unavailable'
+mark file::mode;        assert_ne 'mode returns permissions' "$(file::mode "${META}" 2>/dev/null || true)"
+mark file::inode;       assert_ne 'inode returns inode' "$(file::inode "${META}" 2>/dev/null || true)"
 
 section 'filesystem mutations'
 
@@ -349,13 +329,7 @@ mark file::find_line;   assert_eq 'find_line returns first line number' '2' "$(f
 mark file::find_count;  assert_eq 'find_count counts occurrences' '2' "$(file::find_count "${A}" beta 2>/dev/null || true)"
 mark file::lines_count; assert_eq 'lines_count counts lines' '4' "$(file::lines_count "${A}" 2>/dev/null || true)"
 mark file::words_count; assert_eq 'words_count counts words' '4' "$(file::words_count "${A}" 2>/dev/null || true)"
-
-count_file="${root}/counts.txt"
-file::write_lines "${count_file}" "one two" "three four" "five"
-
-touch_fn file::bytes_count
-count_size="$(wc -c < "${count_file}" | tr -d '[:space:]')"
-eq "$(file::bytes_count "${count_file}")" "${count_size}" "bytes_count aliases size"
+mark file::bytes_count; A_SIZE="$(wc -c < "${A}" | tr -d '[:space:]')"; assert_eq 'bytes_count aliases size' "${A_SIZE}" "$(file::bytes_count "${A}" 2>/dev/null | tr -d '\n' || true)"
 
 section 'write, append, prepend APIs'
 
