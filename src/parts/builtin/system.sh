@@ -737,15 +737,14 @@ sys::ppid () {
 }
 sys::proxy () {
 
-    local k="" found=1
+    local k=""
 
     for k in HTTPS_PROXY https_proxy HTTP_PROXY http_proxy ALL_PROXY all_proxy NO_PROXY no_proxy; do
         [[ -n "${!k:-}" ]] || continue
         printf '%s=%s\n' "${k}" "${!k}"
-        found=0
     done
 
-    return "${found}"
+    return 0
 
 }
 sys::ip () {
@@ -873,6 +872,13 @@ sys::username () {
 
 }
 
+sys::path_name () {
+
+    if sys::is_windows; then printf '%s\n' "Path"
+    else printf '%s\n' "PATH"
+    fi
+
+}
 sys::path_sep () {
 
     if sys::is_windows; then printf '%s\n' ";"
@@ -900,36 +906,6 @@ sys::lib_suffix () {
     elif sys::is_macos; then printf '%s\n' ".dylib"
     else printf '%s\n' ".so"
     fi
-
-}
-sys::path_name () {
-
-    if sys::is_windows; then printf '%s\n' "Path"
-    else printf '%s\n' "PATH"
-    fi
-
-}
-sys::path_dirs () {
-
-    local path_value="${PATH:-}" sep="" part=""
-
-    [[ -n "${path_value}" ]] || return 0
-
-    case "${path_value}" in
-        *";"*) sep=";" ;;
-        *)     sep=":" ;;
-    esac
-
-    while [[ "${path_value}" == *"${sep}"* ]]; do
-
-        part="${path_value%%"${sep}"*}"
-        path_value="${path_value#*"${sep}"}"
-
-        [[ -n "${part}" ]] && printf '%s\n' "${part}"
-
-    done
-
-    [[ -n "${path_value}" ]] && printf '%s\n' "${path_value}"
 
 }
 
@@ -990,6 +966,29 @@ sys::which_all () {
     done
 
     return "${found}"
+
+}
+sys::path_dirs () {
+
+    local path_value="${PATH:-}" sep="" part=""
+
+    [[ -n "${path_value}" ]] || return 0
+
+    case "${path_value}" in
+        *";"*) sep=";" ;;
+        *)     sep=":" ;;
+    esac
+
+    while [[ "${path_value}" == *"${sep}"* ]]; do
+
+        part="${path_value%%"${sep}"*}"
+        path_value="${path_value#*"${sep}"}"
+
+        [[ -n "${part}" ]] && printf '%s\n' "${part}"
+
+    done
+
+    [[ -n "${path_value}" ]] && printf '%s\n' "${path_value}"
 
 }
 sys::open () {
@@ -1079,7 +1078,7 @@ sys::open () {
 
 }
 
-sys::df_field () {
+sys::disk_df_field () {
 
     local path="${1:-.}" field="${2:-}" win="" norm="" distro="" linux_path="" v=""
 
@@ -1134,7 +1133,7 @@ sys::disk_total () {
         [[ "${v}" =~ ^[0-9]+$ ]] && { printf '%s\n' "$(( v * 1024 ))"; return 0; }
     fi
 
-    sys::df_field "${path}" 2
+    sys::disk_df_field "${path}" 2
 
 }
 sys::disk_free () {
@@ -1149,7 +1148,7 @@ sys::disk_free () {
         [[ "${v}" =~ ^[0-9]+$ ]] && { printf '%s\n' "$(( v * 1024 ))"; return 0; }
     fi
 
-    sys::df_field "${path}" 4
+    sys::disk_df_field "${path}" 4
 
 }
 sys::disk_used () {
@@ -1334,20 +1333,19 @@ sys::mem_info () {
 
     local total="" free="" used="" percent=""
 
-    total="$(sys::mem_total 2>/dev/null || true)"
-    free="$(sys::mem_free 2>/dev/null || true)"
+    total="$(sys::mem_total 2>/dev/null)" || return 1
+    free="$(sys::mem_free 2>/dev/null)"   || return 1
 
     [[ "${total}" =~ ^[0-9]+$ ]] || return 1
-    [[ "${free}" =~ ^[0-9]+$ ]] || return 1
+    [[ "${free}"  =~ ^[0-9]+$ ]] || return 1
 
     (( free <= total )) || free="${total}"
     used="$(( total - free ))"
 
-    if (( total > 0 )); then percent="$(( used * 100 / total ))"
-    else return 1
-    fi
+    (( total > 0 )) || return 1
+    percent="$(( used * 100 / total ))"
 
-    printf '%s\n' "total=${total}" "free=${free}" "used=${used}" "percent=${percent}"
+    printf 'total=%s\nfree=%s\nused=%s\npercent=%s\n' "${total}" "${free}" "${used}" "${percent}"
 
 }
 
@@ -1596,6 +1594,7 @@ sys::bash_msrv () {
     (( c1 < n1 )) && return 1
     (( c2 > n2 )) && return 0
     (( c2 < n2 )) && return 1
+
     (( c3 >= n3 ))
 
 }
@@ -1741,6 +1740,7 @@ sys::ensure_bash () {
     [[ -n "${found}" ]] || exit 1
 
     script="${0:-}"
+
     [[ -z "${script}" || ! -f "${script}" ]] && script="${BASH_SOURCE[0]:-${0:-}}"
     [[ -n "${script}" && -f "${script}" ]] || exit 1
 
