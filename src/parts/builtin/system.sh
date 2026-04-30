@@ -356,6 +356,17 @@ sys::null () {
     fi
 
 }
+sys::shell () {
+
+    local v=""
+
+    v="${BASH:-}"
+    [[ -n "${v}" ]] || v="${0:-}"
+    [[ -n "${v}" ]] || return 1
+
+    printf '%s\n' "${v}"
+
+}
 sys::path_sep () {
 
     if sys::is_windows; then printf '%s\n' ";"
@@ -713,17 +724,6 @@ sys::loadavg () {
     fi
 
     return 1
-
-}
-sys::shell () {
-
-    local v=""
-
-    v="${BASH:-}"
-    [[ -n "${v}" ]] || v="${0:-}"
-    [[ -n "${v}" ]] || return 1
-
-    printf '%s\n' "${v}"
 
 }
 sys::hostname () {
