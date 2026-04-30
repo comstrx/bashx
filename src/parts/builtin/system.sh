@@ -349,6 +349,73 @@ sys::can_sudo () {
 
 }
 
+sys::null () {
+
+    if sys::is_windows; then printf '%s\n' "NUL"
+    else printf '%s\n' "/dev/null"
+    fi
+
+}
+sys::path_sep () {
+
+    if sys::is_windows; then printf '%s\n' ";"
+    else printf '%s\n' ":"
+    fi
+
+}
+sys::line_sep () {
+
+    if sys::is_windows; then printf '%s\n' "crlf"
+    else printf '%s\n' "lf"
+    fi
+
+}
+sys::env_path_name () {
+
+    if sys::is_windows; then printf '%s\n' "Path"
+    else printf '%s\n' "PATH"
+    fi
+
+}
+sys::exe_suffix () {
+
+    if sys::is_windows; then printf '%s\n' ".exe"
+    else printf '%s\n' ""
+    fi
+
+}
+sys::lib_suffix () {
+
+    if sys::is_windows; then printf '%s\n' ".dll"
+    elif sys::is_macos; then printf '%s\n' ".dylib"
+    else printf '%s\n' ".so"
+    fi
+
+}
+sys::path_dirs () {
+
+    local path_value="${PATH:-}" sep="" part=""
+
+    [[ -n "${path_value}" ]] || return 0
+
+    case "${path_value}" in
+        *";"*) sep=";" ;;
+        *)     sep=":" ;;
+    esac
+
+    while [[ "${path_value}" == *"${sep}"* ]]; do
+
+        part="${path_value%%"${sep}"*}"
+        path_value="${path_value#*"${sep}"}"
+
+        [[ -n "${part}" ]] && printf '%s\n' "${part}"
+
+    done
+
+    [[ -n "${path_value}" ]] && printf '%s\n' "${path_value}"
+
+}
+
 sys::name () {
 
     if sys::is_linux; then
@@ -396,6 +463,23 @@ sys::runtime () {
     fi
     if sys::is_windows; then
         printf '%s\n' "windows"
+        return 0
+    fi
+
+    printf '%s\n' "unknown"
+    return 1
+
+}
+sys::kernel () {
+
+    local v=""
+
+    if sys::has uname; then
+        v="$(uname -s 2>/dev/null || true)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+    if sys::is_windows; then
+        printf '%s\n' "Windows"
         return 0
     fi
 
@@ -476,6 +560,7 @@ sys::manager () {
         sys::has xbps-install && { printf '%s\n' "xbps";    return 0; }
         sys::has nix          && { printf '%s\n' "nix";     return 0; }
         sys::has rpm          && { printf '%s\n' "rpm";     return 0; }
+        sys::has brew         && { printf '%s\n' "brew"; return 0; }
 
         printf '%s\n' "unknown"
         return 1
@@ -492,14 +577,14 @@ sys::manager () {
     fi
     if sys::is_windows; then
 
-        if ( sys::is_msys || sys::is_gitbash ) && sys::has pacman; then
+        if sys::is_msys && sys::has pacman; then
             printf '%s\n' "pacman"
             return 0
         fi
 
         sys::has winget && { printf '%s\n' "winget"; return 0; }
-        sys::has choco  && { printf '%s\n' "choco";  return 0; }
         sys::has scoop  && { printf '%s\n' "scoop";  return 0; }
+        sys::has choco  && { printf '%s\n' "choco";  return 0; }
         sys::has pacman && { printf '%s\n' "pacman"; return 0; }
 
         printf '%s\n' "unknown"
@@ -535,6 +620,141 @@ sys::arch () {
         riscv64)                  printf '%s\n' "riscv64" ;;
         *)                        printf '%s\n' "${v}" ;;
     esac
+
+}
+sys::version () {
+
+    local v=""
+
+    if sys::is_linux; then
+
+        if [[ -r /proc/sys/kernel/osrelease ]]; then
+            IFS= read -r v < /proc/sys/kernel/osrelease || true
+            [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+        fi
+
+    fi
+    if sys::is_macos && sys::has sw_vers; then
+
+        v="$(sw_vers -productVersion 2>/dev/null || true)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+    if sys::is_windows && sys::has powershell.exe; then
+
+        v="$(powershell.exe -NoProfile -NonInteractive -Command "[Environment]::OSVersion.Version.ToString()" 2>/dev/null | tr -d '\r' | head -n 1)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+    if sys::has uname; then
+
+        v="$(uname -r 2>/dev/null || true)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+
+    printf '%s\n' "unknown"
+    return 1
+
+}
+
+sys::uptime () {
+
+    local v=""
+
+    if sys::is_linux && [[ -r /proc/uptime ]]; then
+
+        v="$(awk '{print int($1)}' /proc/uptime 2>/dev/null || true)"
+        [[ "${v}" =~ ^[0-9]+$ ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+    if sys::is_macos && sys::has sysctl; then
+
+        v="$(sysctl -n kern.boottime 2>/dev/null | sed -n 's/.*sec = \([0-9][0-9]*\).*/\1/p' | head -n 1)"
+        [[ "${v}" =~ ^[0-9]+$ ]] && { printf '%s\n' "$(( $(date +%s) - v ))"; return 0; }
+
+    fi
+    if sys::is_windows && sys::has powershell.exe; then
+
+        v="$(powershell.exe -NoProfile -NonInteractive -Command "\$b=(Get-CimInstance Win32_OperatingSystem).LastBootUpTime; [int64]((Get-Date)-\$b).TotalSeconds" 2>/dev/null | tr -d '\r' | head -n 1)"
+        [[ "${v}" =~ ^[0-9]+$ ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+
+    return 1
+
+}
+sys::loadavg () {
+
+    local v="" a="" b="" c=""
+
+    if [[ -r /proc/loadavg ]]; then
+
+        awk '{print $1" "$2" "$3}' /proc/loadavg 2>/dev/null
+        return
+
+    fi
+    if sys::has uptime; then
+
+        v="$(uptime 2>/dev/null || true)"
+        v="${v##*load average: }"
+        v="${v##*load averages: }"
+        v="${v//,/}"
+
+        read -r a b c _ <<< "${v}"
+        [[ -n "${a}" && -n "${b}" && -n "${c}" ]] && { printf '%s %s %s\n' "${a}" "${b}" "${c}"; return 0; }
+
+    fi
+    if sys::is_windows; then
+
+        printf '%s\n' "0 0 0"
+        return 0
+
+    fi
+
+    return 1
+
+}
+sys::hostname () {
+
+    local v=""
+
+    if sys::has hostname; then
+        v="$(hostname 2>/dev/null || true)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+
+    v="${HOSTNAME:-${COMPUTERNAME:-}}"
+    [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    printf '%s\n' "unknown"
+    return 1
+
+}
+sys::username () {
+
+    local v=""
+
+    if sys::has id; then
+
+        v="$(id -un 2>/dev/null || true)"
+        v="${v##*\\}"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+    if sys::has whoami; then
+
+        v="$(whoami 2>/dev/null || true)"
+        v="${v##*\\}"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+
+    v="${USER:-${USERNAME:-${LOGNAME:-}}}"
+    v="${v##*\\}"
+
+    [[ -n "${v}" ]] || return 1
+    printf '%s\n' "${v}"
 
 }
 sys::open () {
@@ -845,5 +1065,205 @@ sys::mem_info () {
     [[ "${percent}" =~ ^[0-9]+$ ]] || return 1
 
     printf '%s\n' "total=${total}" "free=${free}" "used=${used}" "percent=${percent}"
+
+}
+
+sys::cpu_threads () {
+
+    local v=""
+
+    if sys::has getconf; then
+        v="$(getconf _NPROCESSORS_ONLN 2>/dev/null || true)"
+        [[ "${v}" =~ ^[0-9]+$ && "${v}" -gt 0 ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+    if sys::is_linux && [[ -r /proc/cpuinfo ]]; then
+        v="$(grep -c '^processor[[:space:]]*:' /proc/cpuinfo 2>/dev/null || true)"
+        [[ "${v}" =~ ^[0-9]+$ && "${v}" -gt 0 ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+    if sys::is_macos && sys::has sysctl; then
+        v="$(sysctl -n hw.logicalcpu 2>/dev/null || true)"
+        [[ "${v}" =~ ^[0-9]+$ && "${v}" -gt 0 ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+    if sys::is_windows && sys::has powershell.exe; then
+        v="$(powershell.exe -NoProfile -NonInteractive -Command "[Environment]::ProcessorCount" 2>/dev/null | tr -d '\r' | head -n 1)"
+        [[ "${v}" =~ ^[0-9]+$ && "${v}" -gt 0 ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+
+    v="${NUMBER_OF_PROCESSORS:-}"
+    [[ "${v}" =~ ^[0-9]+$ && "${v}" -gt 0 ]] && { printf '%s\n' "${v}"; return 0; }
+
+    printf '%s\n' "1"
+
+}
+sys::cpu_cores () {
+
+    local v=""
+
+    if sys::is_linux && [[ -r /proc/cpuinfo ]]; then
+
+        v="$(awk -F: '
+            /physical id/ {
+                gsub(/^[ \t]+/, "", $2)
+                socket=$2
+            }
+            /cpu cores/ {
+                gsub(/^[ \t]+/, "", $2)
+                cores=$2
+                if ( socket == "" ) socket=0
+                if ( cores ~ /^[0-9]+$/ ) seen[socket]=cores
+            }
+            END {
+                total=0
+                for ( s in seen ) total += seen[s]
+                if ( total > 0 ) print total
+            }
+        ' /proc/cpuinfo 2>/dev/null || true)"
+
+        [[ "${v}" =~ ^[0-9]+$ && "${v}" -gt 0 ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+    if sys::is_macos && sys::has sysctl; then
+
+        v="$(sysctl -n hw.physicalcpu 2>/dev/null || true)"
+        [[ "${v}" =~ ^[0-9]+$ && "${v}" -gt 0 ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+    if sys::is_windows && sys::has powershell.exe; then
+
+        v="$(powershell.exe -NoProfile -NonInteractive -Command "(Get-CimInstance Win32_Processor | Measure-Object -Property NumberOfCores -Sum).Sum" 2>/dev/null | tr -d '\r' | head -n 1)"
+        [[ "${v}" =~ ^[0-9]+$ && "${v}" -gt 0 ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
+
+    sys::cpu_threads
+
+}
+sys::cpu_count () {
+
+    sys::cpu_threads "$@"
+
+}
+sys::cpu_model () {
+
+    local v=""
+
+    if sys::is_linux && [[ -r /proc/cpuinfo ]]; then
+        v="$(awk -F: '/model name|Hardware|Processor/ { sub(/^[ \t]+/, "", $2); print $2; exit }' /proc/cpuinfo 2>/dev/null || true)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+    if sys::is_macos && sys::has sysctl; then
+        v="$(sysctl -n machdep.cpu.brand_string 2>/dev/null || true)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+    if sys::is_windows && sys::has powershell.exe; then
+        v="$(powershell.exe -NoProfile -NonInteractive -Command "(Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Name)" 2>/dev/null | tr -d '\r' | head -n 1)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+    fi
+
+    v="${PROCESSOR_IDENTIFIER:-${PROCESSOR_ARCHITECTURE:-}}"
+    [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    printf '%s\n' "unknown"
+    return 1
+
+}
+sys::cpu_usage () {
+
+    local a="" b="" c="" d="" e="" f="" g="" h="" i="" j="" idle_a="" total_a="" idle_b="" total_b="" diff_idle="" diff_total="" usage=""
+
+    if sys::is_linux && [[ -r /proc/stat ]]; then
+
+        read -r _ a b c d e f g h i j < /proc/stat || return 1
+        idle_a=$(( d + e ))
+        total_a=$(( a + b + c + d + e + f + g + h + i + j ))
+
+        sleep 1
+
+        read -r _ a b c d e f g h i j < /proc/stat || return 1
+        idle_b=$(( d + e ))
+        total_b=$(( a + b + c + d + e + f + g + h + i + j ))
+
+        diff_idle=$(( idle_b - idle_a ))
+        diff_total=$(( total_b - total_a ))
+
+        (( diff_total > 0 )) || return 1
+
+        usage=$(( ( 100 * ( diff_total - diff_idle ) ) / diff_total ))
+        (( usage < 0 )) && usage=0
+        (( usage > 100 )) && usage=100
+
+        printf '%s\n' "${usage}"
+        return 0
+
+    fi
+    if sys::is_macos && sys::has top; then
+
+        usage="$(top -l 1 -n 0 2>/dev/null | awk -F'[:,% ]+' '
+            /CPU usage/ {
+                for ( i=1; i<=NF; i++ ) {
+                    if ( $i == "idle" && i > 1 ) {
+                        idle=$(i-1)
+                        gsub(/[^0-9.]/, "", idle)
+                        printf "%.0f\n", 100 - idle
+                        exit
+                    }
+                }
+            }
+        ')"
+
+        [[ "${usage}" =~ ^[0-9]+$ ]] || return 1
+
+        (( usage < 0 )) && usage=0
+        (( usage > 100 )) && usage=100
+
+        printf '%s\n' "${usage}"
+        return 0
+
+    fi
+    if sys::is_windows && sys::has powershell.exe; then
+
+        usage="$(powershell.exe -NoProfile -NonInteractive -Command "[int](Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average" 2>/dev/null | tr -d '\r' | head -n 1)"
+
+        [[ "${usage}" =~ ^[0-9]+$ ]] || return 1
+
+        (( usage < 0 )) && usage=0
+        (( usage > 100 )) && usage=100
+
+        printf '%s\n' "${usage}"
+        return 0
+
+    fi
+
+    return 1
+
+}
+sys::cpu_idle () {
+
+    local usage=""
+
+    usage="$(sys::cpu_usage 2>/dev/null || true)"
+    [[ "${usage}" =~ ^[0-9]+$ ]] || return 1
+
+    (( usage > 100 )) && usage=100
+    printf '%s\n' "$(( 100 - usage ))"
+
+}
+sys::cpu_info () {
+
+    local model="" cores="" threads="" usage="" idle=""
+
+    model="$(sys::cpu_model 2>/dev/null || printf 'unknown')"
+    cores="$(sys::cpu_cores 2>/dev/null || printf '1')"
+    threads="$(sys::cpu_threads 2>/dev/null || printf '1')"
+    usage="$(sys::cpu_usage 2>/dev/null || printf 'unknown')"
+
+    if [[ "${usage}" =~ ^[0-9]+$ ]]; then
+        (( usage > 100 )) && usage=100
+        idle="$(( 100 - usage ))"
+    else
+        idle="unknown"
+    fi
+
+    printf '%s\n' "model=${model}" "cores=${cores}" "threads=${threads}" "usage=${usage}" "idle=${idle}"
 
 }
