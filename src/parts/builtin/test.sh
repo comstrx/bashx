@@ -227,7 +227,13 @@ mark file::can;         assert_ne 'can returns canonical existing file' "$(file:
 
 section 'metadata'
 
-mark file::size;        assert_eq 'size counts bytes' '23' "$(file::size "${A}" | tr -d '\n')"
+meta_file="${root}/metadata.txt"
+file::write "${meta_file}" "alpha beta gamma delta"
+meta_size="$(wc -c < "${meta_file}" | tr -d '[:space:]')"
+
+touch_fn file::size
+eq "$(file::size "${meta_file}")" "${meta_size}" "size counts bytes"
+
 mark file::mtime;       assert_ne 'mtime returns timestamp' "$(file::mtime "${A}" 2>/dev/null || true)"
 mark file::atime;       assert_ne 'atime returns timestamp' "$(file::atime "${A}" 2>/dev/null || true)"
 mark file::ctime;       assert_ne 'ctime returns timestamp' "$(file::ctime "${A}" 2>/dev/null || true)"
@@ -326,9 +332,12 @@ mark file::find_count;  assert_eq 'find_count counts occurrences' '2' "$(file::f
 mark file::lines_count; assert_eq 'lines_count counts lines' '4' "$(file::lines_count "${A}" 2>/dev/null || true)"
 mark file::words_count; assert_eq 'words_count counts words' '4' "$(file::words_count "${A}" 2>/dev/null || true)"
 
-meta_size="$(wc -c < "${meta_file}" | tr -d '[:space:]')"
-eq "$(file::size "${meta_file}")" "${meta_size}" "size counts bytes"
-eq "$(file::bytes_count "${meta_file}")" "${meta_size}" "bytes_count aliases size"
+count_file="${root}/counts.txt"
+file::write_lines "${count_file}" "one two" "three four" "five"
+
+touch_fn file::bytes_count
+count_size="$(wc -c < "${count_file}" | tr -d '[:space:]')"
+eq "$(file::bytes_count "${count_file}")" "${count_size}" "bytes_count aliases size"
 
 section 'write, append, prepend APIs'
 
