@@ -20,11 +20,11 @@ fi
 # shellcheck source=/dev/null
 source "${TARGET_FILE}"
 
-# if declare -F sys::ensure_bash >/dev/null 2>&1; then
-#     sys::ensure_bash "${MIN_TEST_BASH_VERSION}" "$@"
-# elif declare -F sys::ensure >/dev/null 2>&1; then
-#     sys::ensure "${MIN_TEST_BASH_VERSION}" "$@"
-# fi
+if declare -F sys::ensure_bash >/dev/null 2>&1; then
+    sys::ensure_bash "${MIN_TEST_BASH_VERSION}" "$@"
+elif declare -F sys::ensure >/dev/null 2>&1; then
+    sys::ensure "${MIN_TEST_BASH_VERSION}" "$@"
+fi
 
 set -euo pipefail
 
