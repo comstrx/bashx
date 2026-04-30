@@ -60,11 +60,6 @@ file::dirname () {
     path::dirname "$@"
 
 }
-file::drive () {
-
-    path::drive "$@"
-
-}
 file::stem () {
 
     path::stem "$@"
@@ -203,19 +198,19 @@ file::copy () {
 }
 file::link () {
 
-    path::is_file "${1:-}" || return 1
+    path::is_file "$@" || return 1
     path::link "$@"
 
 }
 file::symlink () {
 
-    path::is_file "${1:-}" || return 1
+    path::is_file "$@" || return 1
     path::symlink "$@"
 
 }
 file::readlink () {
 
-    file::is_link "$@" || return 1
+    path::is_file "$@" || return 1
     path::readlink "$@"
 
 }
