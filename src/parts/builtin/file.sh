@@ -1103,8 +1103,8 @@ file::replace () {
 
     tmp="$(file::mktemp_near "${p}")" || return 1
 
-    esc_from="$(printf '%s' "${from}" | sed -e 's/[]\/[.$*^]/\\&/g')"
-    esc_to="$(printf '%s' "${to}" | sed -e 's/[\/&]/\\&/g')"
+    esc_from="$(printf '%s' "${from}" | sed -e 's/[.[\*^$()+?{}|\\]/\\&/g' -e 's/\]/\\]/g')"
+    esc_to="$(printf '%s' "${to}" | sed -e 's/[\/&\\]/\\&/g')"
 
     sed "s/${esc_from}/${esc_to}/g" < "${p}" > "${tmp}" 2>/dev/null
     rc=$?

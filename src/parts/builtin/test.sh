@@ -325,7 +325,10 @@ mark file::find_line;   assert_eq 'find_line returns first line number' '2' "$(f
 mark file::find_count;  assert_eq 'find_count counts occurrences' '2' "$(file::find_count "${A}" beta 2>/dev/null || true)"
 mark file::lines_count; assert_eq 'lines_count counts lines' '4' "$(file::lines_count "${A}" 2>/dev/null || true)"
 mark file::words_count; assert_eq 'words_count counts words' '4' "$(file::words_count "${A}" 2>/dev/null || true)"
-mark file::bytes_count; assert_eq 'bytes_count aliases size' '23' "$(file::bytes_count "${A}" 2>/dev/null | tr -d '\n')"
+
+meta_size="$(wc -c < "${meta_file}" | tr -d '[:space:]')"
+eq "$(file::size "${meta_file}")" "${meta_size}" "size counts bytes"
+eq "$(file::bytes_count "${meta_file}")" "${meta_size}" "bytes_count aliases size"
 
 section 'write, append, prepend APIs'
 
