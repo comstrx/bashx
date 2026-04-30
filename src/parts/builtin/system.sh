@@ -1501,10 +1501,12 @@ sys::ensure_bash () {
     local need="${1:-}" found="" script=""
 
     if [[ "${need}" =~ ^[0-9]+([.][0-9]+){0,2}$ ]]; then shift || true
-    else need="${MIN_BASH_VERSION:-${MSRV_BASH_VERSION:-${MSRV_VERSION:-3}}}"
+    else need="${MIN_BASH_VERSION:-${MSRV_BASH_VERSION:-${MSRV_VERSION:-5}}}"
     fi
 
     [[ "${need}" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] || exit 1
+
+    sys::bash_msrv "${need}" && { echo "bash skipped : ${need}"; }
     sys::bash_msrv "${need}" && { export ENSURE_MIN_BASH_VERSION_DONE=1; return 0; }
 
     [[ "${ENSURE_MIN_BASH_VERSION_DONE:-}" == "1" ]] && exit 1
