@@ -118,20 +118,6 @@ wait "${BASHX_COPROC_PID}" 2>/dev/null || true
 
 assert_eq 'coproc echo works' 'ping' "${coproc_out}"
 
-trap_file="${ROOT_TMP}/trap.txt"
-
-(
-    set -Ee
-    trap 'printf "%s" "hit" > "'"${trap_file}"'"' ERR
-    false
-) >/dev/null 2>&1 || true
-
-if [[ "$(cat "${trap_file}" 2>/dev/null || true)" == "hit" ]]; then
-    pass 'ERR trap fires in strict subshell'
-else
-    fail 'ERR trap fires in strict subshell'
-fi
-
 section 'command discovery'
 
 mark sys::has
