@@ -1501,7 +1501,7 @@ sys::ensure_bash () {
     local need="${1:-}" found="" script=""
 
     if [[ "${need}" =~ ^[0-9]+([.][0-9]+){0,2}$ ]]; then shift || true
-    else need="${MIN_BASH_VERSION:-${MSRV_BASH_VERSION:-${MSRV_VERSION:-5}}}"
+    else need="${MIN_BASH_VERSION:-${MSRV_BASH_VERSION:-${MSRV_VERSION:-3}}}"
     fi
 
     [[ "${need}" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] || exit 1
