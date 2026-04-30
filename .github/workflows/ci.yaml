@@ -17,8 +17,8 @@ defaults:
   run:
     shell: bash
 
-# env:
-#   MSRV_BASH_VERSION: "5.2"
+env:
+  MSRV_BASH_VERSION: "5.2"
 
 jobs:
   test:
