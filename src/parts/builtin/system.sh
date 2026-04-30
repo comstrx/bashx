@@ -4,6 +4,18 @@ sys::has () {
     command -v "${1:-}" >/dev/null 2>&1
 
 }
+sys::shell () {
+
+    local v=""
+    v="${BASH:-}"
+
+    [[ -n "${v}" ]] || v="${0:-}"
+    [[ -n "${v}" ]] || return 1
+
+    printf '%s\n' "${v}"
+
+}
+
 sys::is_linux () {
 
     local s=""
@@ -349,22 +361,57 @@ sys::can_sudo () {
 
 }
 
-sys::null () {
+sys::which () {
 
-    if sys::is_windows; then printf '%s\n' "NUL"
-    else printf '%s\n' "/dev/null"
+    local bin="${1:-}" v=""
+
+    [[ -n "${bin}" ]] || return 1
+    [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
+
+    v="$(command -v -- "${bin}" 2>/dev/null || true)"
+    [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    if sys::is_windows; then
+        for v in ".exe" ".cmd" ".bat" ".ps1"; do
+            command -v -- "${bin}${v}" >/dev/null 2>&1 || continue
+            command -v -- "${bin}${v}" 2>/dev/null
+            return 0
+        done
     fi
 
+    return 1
+
 }
-sys::shell () {
+sys::which_all () {
 
-    local v=""
+    local bin="${1:-}" path_value="${PATH:-}" sep="" dir="" entry="" ext=""
+    local -a dirs=()
 
-    v="${BASH:-}"
-    [[ -n "${v}" ]] || v="${0:-}"
-    [[ -n "${v}" ]] || return 1
+    [[ -n "${bin}" ]] || return 1
+    [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
 
-    printf '%s\n' "${v}"
+    case "${path_value}" in
+        *";"*) sep=";" ;;
+        *)     sep=":" ;;
+    esac
+
+    IFS="${sep}" read -r -a dirs <<< "${path_value}"
+
+    for dir in "${dirs[@]}"; do
+
+        [[ -n "${dir}" ]] || continue
+
+        entry="${dir%/}/${bin}"
+        [[ -f "${entry}" && -x "${entry}" ]] && printf '%s\n' "${entry}"
+
+        if sys::is_windows; then
+            for ext in ".exe" ".cmd" ".bat" ".ps1"; do
+                entry="${dir%/}/${bin}${ext}"
+                [[ -f "${entry}" && -x "${entry}" ]] && printf '%s\n' "${entry}"
+            done
+        fi
+
+    done
 
 }
 sys::path_sep () {
@@ -381,13 +428,6 @@ sys::line_sep () {
     fi
 
 }
-sys::env_path_name () {
-
-    if sys::is_windows; then printf '%s\n' "Path"
-    else printf '%s\n' "PATH"
-    fi
-
-}
 sys::exe_suffix () {
 
     if sys::is_windows; then printf '%s\n' ".exe"
@@ -400,6 +440,13 @@ sys::lib_suffix () {
     if sys::is_windows; then printf '%s\n' ".dll"
     elif sys::is_macos; then printf '%s\n' ".dylib"
     else printf '%s\n' ".so"
+    fi
+
+}
+sys::path_name () {
+
+    if sys::is_windows; then printf '%s\n' "Path"
+    else printf '%s\n' "PATH"
     fi
 
 }
@@ -1327,10 +1374,8 @@ sys::bash_msrv () {
 
     (( c1 > n1 )) && return 0
     (( c1 < n1 )) && return 1
-
     (( c2 > n2 )) && return 0
     (( c2 < n2 )) && return 1
-
     (( c3 >= n3 ))
 
 }
@@ -1341,10 +1386,11 @@ sys::bash_ok () {
     [[ -n "${bin}" && -n "${need}" ]] || return 1
 
     sys::has "${bin}" && bin="$(command -v -- "${bin}" 2>/dev/null || true)"
-
     [[ -x "${bin}" ]] || return 1
 
+    # shellcheck disable=SC2016
     cur="$("${bin}" -c 'printf "%s\n" "${BASH_VERSION:-}"' 2>/dev/null || true)"
+
     sys::bash_msrv "${need}" "${cur}"
 
 }
@@ -1459,14 +1505,9 @@ sys::ensure_bash () {
     fi
 
     [[ "${need}" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] || exit 1
-
-    if sys::bash_msrv "${need}"; then
-        export ENSURE_MIN_BASH_VERSION_DONE=1
-        return 0
-    fi
+    sys::bash_msrv "${need}" && { export ENSURE_MIN_BASH_VERSION_DONE=1; return 0; }
 
     [[ "${ENSURE_MIN_BASH_VERSION_DONE:-}" == "1" ]] && exit 1
-
     found="$(sys::find_bash "${need}" 2>/dev/null || true)"
 
     if [[ -z "${found}" ]]; then
@@ -1477,9 +1518,9 @@ sys::ensure_bash () {
 
     fi
 
-    script="${0:-}"
-
     [[ -n "${found}" ]] || exit 1
+
+    script="${0:-}"
     [[ -z "${script}" || ! -f "${script}" ]] && script="${BASH_SOURCE[0]:-${0:-}}"
     [[ -n "${script}" && -f "${script}" ]] || exit 1
 

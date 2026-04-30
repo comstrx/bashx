@@ -2,9 +2,9 @@
 set -Eeuo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/system.sh"
 
-MIN_BASH_VERSION=5
+MIN_BASH_VERSION=3
 
-# sys::ensure_bash "$@"
+sys::ensure_bash "$@"
 
 declare -A map=()
 map["name"]="bashx"
