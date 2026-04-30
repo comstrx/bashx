@@ -26,7 +26,7 @@ source "${TARGET_FILE}"
 #     sys::ensure "${MIN_TEST_BASH_VERSION}" "$@"
 # fi
 
-set -uo pipefail
+set -euo pipefail
 
 # if [[ "${BASH_VERSION:-}" =~ ^([0-9]+)([.]([0-9]+))?([.]([0-9]+))? ]]; then
 #     if (( BASH_REMATCH[1] < 5 || ( BASH_REMATCH[1] == 5 && ${BASH_REMATCH[3]:-0} < 2 ) )); then
