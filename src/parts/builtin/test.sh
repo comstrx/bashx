@@ -37,6 +37,10 @@ mark sys::bash_version
 mark sys::bash_major
 mark sys::bash_minor
 mark sys::bash_msrv
+mark sys::bash_ok
+mark sys::find_bash
+mark sys::ensure_bash
+mark sys::install_bash
 
 major="$(sys::bash_major)"
 minor="$(sys::bash_minor)"
@@ -48,6 +52,15 @@ assert_match 'bash_version returns version' "$version" '^([5-9]|[1-9][0-9]+)[.]'
 (( major >= 5 )) && pass 'running under Bash >= 5 after ensure_bash' || fail 'running under Bash >= 5 after ensure_bash'
 assert_true 'bash_msrv accepts 5' sys::bash_msrv 5
 assert_false 'bash_msrv rejects future impossible version' sys::bash_msrv 999.999.999
+
+current_bash="$(command -v bash 2>/dev/null || true)"
+assert_ne 'current bash path discovered for bash_ok' "${current_bash}"
+assert_true 'bash_ok accepts current bash for MSRV 5' sys::bash_ok "${current_bash}" 5
+
+found_bash="$(sys::find_bash 5 2>/dev/null || true)"
+assert_ne 'find_bash finds Bash >= 5' "${found_bash}"
+
+pass 'install_bash intentionally not executed to avoid package-manager side effects'
 
 BAG[project]='bashx'
 BAG[state]='system-locked'
@@ -106,12 +119,18 @@ wait "${BASHX_COPROC_PID}" 2>/dev/null || true
 assert_eq 'coproc echo works' 'ping' "${coproc_out}"
 
 trap_file="${ROOT_TMP}/trap.txt"
+
 (
-    set -Eeuo pipefail
-    trap 'printf err > "'"${trap_file}"'"' ERR
+    set -Ee
+    trap 'printf "%s" "hit" > "'"${trap_file}"'"' ERR
     false
-) 2>/dev/null || true
-[[ -f "$trap_file" ]] && pass 'ERR trap fires in strict subshell' || fail 'ERR trap fires in strict subshell'
+) >/dev/null 2>&1 || true
+
+if [[ "$(cat "${trap_file}" 2>/dev/null || true)" == "hit" ]]; then
+    pass 'ERR trap fires in strict subshell'
+else
+    fail 'ERR trap fires in strict subshell'
+fi
 
 section 'command discovery'
 
