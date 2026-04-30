@@ -111,6 +111,11 @@ dir::dirname () {
     path::dirname "$@"
 
 }
+dir::drive () {
+
+    path::drive "$@"
+
+}
 dir::resolve () {
 
     path::resolve "$@"
@@ -138,12 +143,6 @@ dir::can () {
 
 }
 
-dir::type () {
-
-    path::is_dir "$@" || return 1
-    printf 'dir'
-
-}
 dir::size () {
 
     path::is_dir "$@" || return 1
@@ -207,7 +206,7 @@ dir::tree () {
 
 dir::new () {
 
-    path::is_dir "$@" && return 1
+    path::missing "$@" || return 1
     path::mkdir "$@"
 
 }
@@ -313,6 +312,7 @@ dir::archive () {
 }
 dir::extract () {
 
+    path::is_file "$@" || return 1
     path::extract "$@"
 
 }
@@ -458,7 +458,7 @@ dir::contains () {
     local parent="${1:-}" name="${2:-}"
 
     dir::exists "${parent}" || return 1
-    path::valid "${name}" || return 1
+    dir::valid "${name}" || return 1
 
     [[ -n "${name}" ]] || return 1
     [[ "${name}" != "." && "${name}" != ".." ]] || return 1
@@ -472,7 +472,7 @@ dir::contains_file () {
     local parent="${1:-}" name="${2:-}"
 
     dir::exists "${parent}" || return 1
-    path::valid "${name}" || return 1
+    dir::valid "${name}" || return 1
 
     [[ -n "${name}" ]] || return 1
     [[ "${name}" != "." && "${name}" != ".." ]] || return 1
@@ -486,7 +486,7 @@ dir::contains_dir () {
     local parent="${1:-}" name="${2:-}"
 
     dir::exists "${parent}" || return 1
-    path::valid "${name}" || return 1
+    dir::valid "${name}" || return 1
 
     [[ -n "${name}" ]] || return 1
     [[ "${name}" != "." && "${name}" != ".." ]] || return 1
@@ -500,7 +500,7 @@ dir::contains_link () {
     local parent="${1:-}" name="${2:-}"
 
     dir::exists "${parent}" || return 1
-    path::valid "${name}" || return 1
+    dir::valid "${name}" || return 1
 
     [[ -n "${name}" ]] || return 1
     [[ "${name}" != "." && "${name}" != ".." ]] || return 1
@@ -514,7 +514,7 @@ dir::contains_hidden () {
     local parent="${1:-}" name="${2:-}"
 
     dir::exists "${parent}" || return 1
-    path::valid "${name}" || return 1
+    dir::valid "${name}" || return 1
 
     [[ -n "${name}" ]] || return 1
     [[ "${name}" != "." && "${name}" != ".." ]] || return 1

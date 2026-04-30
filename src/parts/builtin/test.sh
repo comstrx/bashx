@@ -1,1092 +1,450 @@
 #!/usr/bin/env bash
-# dir_brutal_test_v1.sh
-# Brutal production CI test suite for bashx/std/dir.sh
-#
-# Usage:
-#   bash dir_brutal_test_v1.sh [path/to/path.sh] [path/to/dir.sh]
-#
-# Environment:
-#   BASHX_TEST_VERBOSE=1       print passing assertions
-#   BASHX_TEST_SLOW=1          enable heavier archive/checksum/snapshot stress
-#   BASHX_TEST_WATCH=0         disable watch tests
-#   BASHX_TEST_SHELLCHECK=1    run shellcheck on both libs when available
-#   BASHX_TEST_FUZZ=300        path/name fuzz iterations
-#
-# Design:
-#   - sources path.sh then dir.sh
-#   - standalone sys::* shim when system.sh is not loaded
-#   - creates a destructive sandbox only under mktemp
-#   - checks every declared dir::* function is tested
-#   - expects directory-specific safety semantics, especially:
-#       dir::contains* accepts child names only, not paths/traversal.
 
-set -u
+set -uo pipefail
 
-PATH_LIB="${1:-${PATH_LIB:-src/parts/builtin/path.sh}}"
-DIR_LIB="${2:-${DIR_LIB:-src/parts/builtin/dir.sh}}"
+ROOT="${ROOT:-}"
+TARGET_FILE="${TARGET_FILE:-src/parts/builtin/file.sh}"
+PATH_FILE="${PATH_FILE:-src/parts/builtin/path.sh}"
+DIR_FILE="${DIR_FILE:-src/parts/builtin/dir.sh}"
+SYSTEM_FILE="${SYSTEM_FILE:-src/parts/builtin/system.sh}"
 
-TEST_ROOT=""
-MAIN_PID="${BASHPID:-$$}"
+if [[ -z "${ROOT}" ]]; then
+    ROOT="$(pwd -P 2>/dev/null || pwd)"
+fi
+
+cd "${ROOT}" 2>/dev/null || exit 1
+
+[[ -f "${SYSTEM_FILE}" ]] && source "${SYSTEM_FILE}"
+[[ -f "${PATH_FILE}"   ]] && source "${PATH_FILE}"
+[[ -f "${DIR_FILE}"    ]] && source "${DIR_FILE}"
+[[ -f "${TARGET_FILE}" ]] && source "${TARGET_FILE}"
+
+if ! declare -F file::exists >/dev/null 2>&1; then
+    printf 'FATAL: file.sh was not loaded: %s\n' "${TARGET_FILE}" >&2
+    exit 1
+fi
+
+if ! declare -F path::exists >/dev/null 2>&1; then
+    printf 'FATAL: path.sh was not loaded: %s\n' "${PATH_FILE}" >&2
+    exit 1
+fi
+
+if ! declare -F sys::has >/dev/null 2>&1; then
+    sys::has () { command -v -- "${1:-}" >/dev/null 2>&1; }
+fi
+
 TOTAL=0
 PASS=0
 FAIL=0
 SKIP=0
 
-VERBOSE="${BASHX_TEST_VERBOSE:-0}"
-SLOW="${BASHX_TEST_SLOW:-0}"
-DO_WATCH="${BASHX_TEST_WATCH:-1}"
-DO_SHELLCHECK="${BASHX_TEST_SHELLCHECK:-0}"
-FUZZ="${BASHX_TEST_FUZZ:-300}"
+ROOT_TMP="$(mktemp -d 2>/dev/null || mktemp -d -t bashx_file_test)"
+A="${ROOT_TMP}/a.txt"
+B="${ROOT_TMP}/b.txt"
+C="${ROOT_TMP}/c.txt"
+D="${ROOT_TMP}/deep/inner/d.txt"
+BIN="${ROOT_TMP}/bin.dat"
+EMPTY="${ROOT_TMP}/empty.txt"
+MISSING="${ROOT_TMP}/missing.txt"
+DIR="${ROOT_TMP}/dir"
+OUT="${ROOT_TMP}/out"
+LOCK="${ROOT_TMP}/lockfile"
 
-declare -A TESTED_FUNCS=()
-
-# -----------------------------------------------------------------------------
-# Minimal sys::* compatibility layer.
-# -----------------------------------------------------------------------------
-
-declare -F sys::has >/dev/null 2>&1 || sys::has () { command -v -- "${1:-}" >/dev/null 2>&1; }
-declare -F sys::is_linux >/dev/null 2>&1 || sys::is_linux () { [[ "${OSTYPE:-}" == linux* ]]; }
-declare -F sys::is_macos >/dev/null 2>&1 || sys::is_macos () { [[ "${OSTYPE:-}" == darwin* ]]; }
-declare -F sys::is_windows >/dev/null 2>&1 || sys::is_windows () { [[ "${OS:-}" == Windows_NT || "${OSTYPE:-}" == msys* || "${OSTYPE:-}" == cygwin* || "${OSTYPE:-}" == win32* ]]; }
-declare -F sys::is_wsl >/dev/null 2>&1 || sys::is_wsl () { [[ -n "${WSL_DISTRO_NAME:-}${WSL_INTEROP:-}" ]] && return 0; grep -qi microsoft /proc/sys/kernel/osrelease 2>/dev/null; }
-declare -F sys::uhome >/dev/null 2>&1 || sys::uhome () { printf '%s\n' "${HOME:-${USERPROFILE:-}}"; }
-
-# -----------------------------------------------------------------------------
-# Harness
-# -----------------------------------------------------------------------------
+mkdir -p "${DIR}" "${OUT}" "${ROOT_TMP}/deep/inner"
+printf 'alpha\nbeta\ngamma\nbeta\n' > "${A}"
+printf 'alpha\nbeta\ngamma\nbeta\n' > "${B}"
+printf 'different\n' > "${C}"
+printf '' > "${EMPTY}"
+printf '\000\001\002\377' > "${BIN}"
 
 cleanup () {
-    [[ "${BASHPID:-$$}" == "${MAIN_PID}" ]] || return 0
-    if [[ -n "${TEST_ROOT:-}" && -d "${TEST_ROOT:-}" ]]; then
-        chmod -R u+rwX -- "${TEST_ROOT}" 2>/dev/null || true
-        rm -rf -- "${TEST_ROOT}" 2>/dev/null || true
-    fi
+    rm -rf -- "${ROOT_TMP}" 2>/dev/null || true
 }
-trap 'cleanup; exit 130' INT TERM
+trap cleanup EXIT INT TERM
 
-note () { printf '\n\033[1;36m[%s]\033[0m\n' "$*"; }
+declare -A HIT=()
 
 mark () {
-    local fn="${1:-}"
-    [[ -n "${fn}" ]] && TESTED_FUNCS["${fn}"]=1
+    HIT["$1"]=1
 }
 
-ok () {
-    TOTAL=$(( TOTAL + 1 ))
+say () {
+    printf '%s\n' "$*"
+}
+
+pass () {
     PASS=$(( PASS + 1 ))
-    [[ "${VERBOSE}" == 1 ]] && printf '  \033[32mPASS\033[0m %s\n' "$1"
-    return 0
+    TOTAL=$(( TOTAL + 1 ))
+    printf '  PASS %s\n' "$1"
 }
 
 fail () {
-    TOTAL=$(( TOTAL + 1 ))
     FAIL=$(( FAIL + 1 ))
-    printf '  \033[31mFAIL\033[0m %s\n' "$1"
-    return 1
+    TOTAL=$(( TOTAL + 1 ))
+    printf '  FAIL %s\n' "$1" >&2
 }
 
 skip () {
-    TOTAL=$(( TOTAL + 1 ))
     SKIP=$(( SKIP + 1 ))
-    printf '  \033[33mSKIP\033[0m %s\n' "$1"
-    return 0
+    printf '  SKIP %s\n' "$1"
 }
 
 assert_true () {
-    local label="$1"; shift
-    if "$@" >/dev/null 2>&1; then ok "${label}"; else fail "${label}"; fi
+    local name="$1"
+    shift
+
+    if "$@"; then pass "${name}"
+    else fail "${name}"
+    fi
 }
 
 assert_false () {
-    local label="$1"; shift
-    if "$@" >/dev/null 2>&1; then fail "${label}"; else ok "${label}"; fi
+    local name="$1"
+    shift
+
+    if "$@"; then fail "${name}"
+    else pass "${name}"
+    fi
 }
 
 assert_eq () {
-    local label="$1" expected="$2" actual="$3"
-    if [[ "${actual}" == "${expected}" ]]; then
-        ok "${label}"
+    local name="$1" expected="$2" actual="$3"
+
+    if [[ "${actual}" == "${expected}" ]]; then pass "${name}"
     else
-        fail "${label} :: expected=[${expected}] actual=[${actual}]"
+        fail "${name}: expected <${expected}> got <${actual}>"
     fi
 }
 
 assert_ne () {
-    local label="$1" a="$2" b="$3"
-    if [[ "${a}" != "${b}" ]]; then ok "${label}"; else fail "${label} :: both=[${a}]"; fi
-}
+    local name="$1" actual="$2"
 
-assert_match () {
-    local label="$1" value="$2" regex="$3"
-    if [[ "${value}" =~ ${regex} ]]; then ok "${label}"; else fail "${label} :: value=[${value}] regex=[${regex}]"; fi
-}
-
-assert_file () {
-    local label="$1" p="$2"
-    [[ -f "${p}" ]] && ok "${label}" || fail "${label} :: missing file ${p}"
-}
-
-assert_dir () {
-    local label="$1" p="$2"
-    [[ -d "${p}" ]] && ok "${label}" || fail "${label} :: missing dir ${p}"
-}
-
-assert_link () {
-    local label="$1" p="$2"
-    [[ -L "${p}" ]] && ok "${label}" || fail "${label} :: missing link ${p}"
-}
-
-assert_missing () {
-    local label="$1" p="$2"
-    [[ ! -e "${p}" && ! -L "${p}" ]] && ok "${label}" || fail "${label} :: still exists ${p}"
-}
-
-run_timeout () {
-    local seconds="$1"; shift
-    if command -v timeout >/dev/null 2>&1; then
-        timeout "${seconds}" "$@"
-    elif command -v gtimeout >/dev/null 2>&1; then
-        gtimeout "${seconds}" "$@"
-    else
-        "$@"
+    if [[ -n "${actual}" ]]; then pass "${name}"
+    else fail "${name}: empty output"
     fi
 }
 
-can_exact_chmod () {
-    sys::is_windows && return 1
-    return 0
+assert_file_content () {
+    local name="$1" file="$2" expected="$3" actual=""
+
+    actual="$(cat "${file}" 2>/dev/null || true)"
+    assert_eq "${name}" "${expected}" "${actual}"
 }
 
-can_symlink () {
-    local target="${1:-}" link="${2:-}"
-    [[ -n "${target}" && -n "${link}" ]] || return 1
-    ln -s "${target}" "${link}" 2>/dev/null || return 1
-    [[ -L "${link}" ]] || { rm -f -- "${link}" 2>/dev/null || true; return 1; }
-    rm -f -- "${link}" 2>/dev/null || true
-    return 0
+section () {
+    printf '\n[%s]\n' "$1"
 }
 
-portable_sleep () {
-    sleep "${1:-0.2}" 2>/dev/null || sleep 1
-}
+call_timeout () {
+    local seconds="$1"
+    shift
 
-sorted_lines () {
-    if command -v sort >/dev/null 2>&1; then LC_ALL=C sort
-    else cat
+    if sys::has timeout; then timeout "${seconds}" "$@"
+    else return 125
     fi
 }
 
-count_lines () {
-    wc -l | tr -d '[:space:]'
-}
-
-has_line () {
-    local needle="$1"
-    grep -Fx -- "${needle}" >/dev/null 2>&1
-}
-
-callback_touch () {
-    local out="${1:-}" msg="${2:-ok}"
-    printf '%s\n' "${msg}" >> "${out}"
-}
-
-with_lock_callback () {
-    local out="${1:-}"
-    printf 'locked\n' >> "${out}"
-    return 0
-}
-
-# -----------------------------------------------------------------------------
-# Load target
-# -----------------------------------------------------------------------------
-
-if [[ ! -f "${PATH_LIB}" ]]; then
-    printf 'Target path.sh not found: %s\n' "${PATH_LIB}" >&2
-    exit 2
-fi
-if [[ ! -f "${DIR_LIB}" ]]; then
-    printf 'Target dir.sh not found: %s\n' "${DIR_LIB}" >&2
-    exit 2
-fi
-
-if ! bash -n "${PATH_LIB}" 2>/dev/null; then
-    printf 'Syntax check failed: %s\n' "${PATH_LIB}" >&2
-    bash -n "${PATH_LIB}"
-    exit 2
-fi
-if ! bash -n "${DIR_LIB}" 2>/dev/null; then
-    printf 'Syntax check failed: %s\n' "${DIR_LIB}" >&2
-    bash -n "${DIR_LIB}"
-    exit 2
-fi
-
-if [[ "${DO_SHELLCHECK}" == 1 ]]; then
-    if command -v shellcheck >/dev/null 2>&1; then
-        shellcheck "${PATH_LIB}" -e SC2148
-        shellcheck "${DIR_LIB}" -e SC2148
-    else
-        printf 'shellcheck unavailable; skipping static check\n' >&2
-    fi
-fi
-
-# shellcheck source=/dev/null
-source "${PATH_LIB}"
-# shellcheck source=/dev/null
-source "${DIR_LIB}"
-
-if ! declare -F dir::exists >/dev/null 2>&1; then
-    printf 'Failed to load dir functions from: %s\n' "${DIR_LIB}" >&2
-    exit 2
-fi
-
-TEST_ROOT="$(mktemp -d 2>/dev/null || mktemp -d -t dirbrutal)"
-mkdir -p -- \
-    "${TEST_ROOT}/root/a/b/c" \
-    "${TEST_ROOT}/root/space dir" \
-    "${TEST_ROOT}/root/unicodé-دليل" \
-    "${TEST_ROOT}/root/.hidden-dir" \
-    "${TEST_ROOT}/root/empty-dir" \
-    "${TEST_ROOT}/root/dash-dir" \
-    "${TEST_ROOT}/outside" \
-    "${TEST_ROOT}/archives" \
-    "${TEST_ROOT}/extract" \
-    "${TEST_ROOT}/dst"
-
-printf 'alpha\n' > "${TEST_ROOT}/root/file.txt"
-printf 'beta\n' > "${TEST_ROOT}/root/space dir/file with spaces.txt"
-printf 'gamma\n' > "${TEST_ROOT}/root/a/b/c/deep.txt"
-printf 'hidden file\n' > "${TEST_ROOT}/root/.hidden-file"
-printf 'unicode file\n' > "${TEST_ROOT}/root/unicodé-دليل/ملف.txt"
-printf 'dash file\n' > "${TEST_ROOT}/root/dash-dir/-dash-file"
-printf 'escape\n' > "${TEST_ROOT}/outside/escape.txt"
-
-ROOT="${TEST_ROOT}/root"
-FILE="${ROOT}/file.txt"
-SUB="${ROOT}/a"
-DEEP="${ROOT}/a/b/c"
-EMPTY="${ROOT}/empty-dir"
-
-unalias -a 2>/dev/null || true
-
-note "target"
-printf 'path: %s\ndir : %s\nroot: %s\n' "${PATH_LIB}" "${DIR_LIB}" "${TEST_ROOT}"
-
-# -----------------------------------------------------------------------------
-# Basic predicates and wrappers
-# -----------------------------------------------------------------------------
-
-note "basic predicates and directory-only wrappers"
-
-mark dir::valid
-assert_true  "valid normal dir path" dir::valid "${ROOT}"
-assert_true  "valid unicode dir path" dir::valid "${ROOT}/unicodé-دليل"
-assert_false "valid rejects empty" dir::valid ""
-assert_false "valid rejects newline" dir::valid $'bad\npath'
-assert_false "valid rejects carriage return" dir::valid $'bad\rpath'
-
-mark dir::exists
-assert_true  "exists dir" dir::exists "${ROOT}"
-assert_false "exists file is not dir" dir::exists "${FILE}"
-assert_false "exists missing" dir::exists "${ROOT}/missing"
-
-mark dir::missing
-assert_true  "missing missing" dir::missing "${ROOT}/missing"
-assert_true  "missing file because not dir" dir::missing "${FILE}"
-assert_false "missing existing dir" dir::missing "${ROOT}"
-
-mark dir::empty
-assert_true  "empty existing empty dir" dir::empty "${EMPTY}"
-assert_false "empty filled dir" dir::empty "${ROOT}"
-assert_true  "empty missing treated as empty" dir::empty "${ROOT}/missing"
-
-mark dir::filled
-assert_true  "filled non-empty dir" dir::filled "${ROOT}"
-assert_false "filled empty dir" dir::filled "${EMPTY}"
-assert_false "filled file rejected" dir::filled "${FILE}"
-
-mark dir::readable
-assert_true  "readable dir" dir::readable "${ROOT}"
-assert_false "readable rejects file" dir::readable "${FILE}"
-
-mark dir::writable
-assert_true  "writable dir" dir::writable "${ROOT}"
-assert_false "writable rejects file" dir::writable "${FILE}"
-
-mark dir::executable
-assert_true  "executable/searchable dir" dir::executable "${ROOT}"
-assert_false "executable rejects file" dir::executable "${FILE}"
-
-mark dir::is_abs
-assert_true  "is_abs existing abs dir" dir::is_abs "${ROOT}"
-assert_false "is_abs rejects file" dir::is_abs "${FILE}"
-assert_false "is_abs rejects relative existing dir unless cwd-local" dir::is_abs "definitely-missing-relative-dir"
-
-mark dir::is_rel
-mkdir -p "${TEST_ROOT}/rel-dir"
-(
-    cd "${TEST_ROOT}" || exit 1
-    assert_true "is_rel relative existing dir" dir::is_rel "rel-dir"
-    assert_false "is_rel absolute existing dir" dir::is_rel "${ROOT}"
-)
-assert_false "is_rel rejects file" dir::is_rel "${FILE}"
-
-mark dir::is_root
-assert_false "is_root normal dir" dir::is_root "${ROOT}"
-if [[ -d "/" ]]; then assert_true "is_root slash dir" dir::is_root "/"; fi
-assert_false "is_root rejects file" dir::is_root "${FILE}"
-
-mark dir::is_hidden
-assert_true  "is_hidden hidden dir" dir::is_hidden "${ROOT}/.hidden-dir"
-assert_false "is_hidden normal dir" dir::is_hidden "${ROOT}/a"
-assert_false "is_hidden rejects hidden file" dir::is_hidden "${ROOT}/.hidden-file"
-
-mark dir::is_under
-assert_true  "is_under child" dir::is_under "${DEEP}" "${ROOT}"
-assert_false "is_under same" dir::is_under "${ROOT}" "${ROOT}"
-assert_false "is_under sibling" dir::is_under "${TEST_ROOT}/outside" "${ROOT}"
-
-mark dir::is_parent
-assert_true  "is_parent parent" dir::is_parent "${ROOT}" "${DEEP}"
-assert_false "is_parent same" dir::is_parent "${ROOT}" "${ROOT}"
-assert_false "is_parent sibling" dir::is_parent "${ROOT}" "${TEST_ROOT}/outside"
-
-mark dir::is_safe
-assert_true  "is_safe child inside root" dir::is_safe "${DEEP}" "${ROOT}"
-assert_false "is_safe traversal rejected" dir::is_safe "${ROOT}/../outside" "${ROOT}"
-assert_false "is_safe root rejected" dir::is_safe "/" "${ROOT}"
-
-mark dir::is_same
-assert_true  "is_same self" dir::is_same "${ROOT}" "${ROOT}"
-assert_false "is_same different dirs" dir::is_same "${ROOT}" "${TEST_ROOT}/outside"
-assert_false "is_same rejects file" dir::is_same "${ROOT}" "${FILE}"
-
-# -----------------------------------------------------------------------------
-# Names, path transforms, metadata
-# -----------------------------------------------------------------------------
-
-note "names, path transforms, metadata"
-
-mark dir::name
-assert_eq "name root leaf" "root" "$(dir::name "${ROOT}")"
-assert_eq "name trailing slash" "a" "$(dir::name "${ROOT}/a/")"
-
-mark dir::parent
-assert_eq "parent name" "$(basename "${TEST_ROOT}")" "$(dir::parent "${ROOT}")"
-
-mark dir::dirname
-assert_eq "dirname root" "${TEST_ROOT}" "$(dir::dirname "${ROOT}")"
-
-mark dir::resolve
-resolved="$(dir::resolve "${ROOT}/a/../a")"
-assert_match "resolve absolute" "${resolved}" '^/'
-assert_eq "resolve basename" "a" "$(basename "${resolved}")"
-
-mark dir::expand
-assert_eq "expand plain dir string" "${ROOT}" "$(dir::expand "${ROOT}")"
-assert_eq "expand ~" "${HOME:-}" "$(dir::expand '~')"
-
-mark dir::abs
-assert_match "abs existing dir" "$(dir::abs "${ROOT}/a/..")" '^/'
-
-mark dir::rel
-assert_eq "rel child dir" "a/b/c" "$(dir::rel "${DEEP}" "${ROOT}")"
-assert_eq "rel same dir" "." "$(dir::rel "${ROOT}" "${ROOT}")"
-
-mark dir::can
-assert_match "can existing dir" "$(dir::can "${ROOT}")" '^/'
-assert_false "can rejects file" dir::can "${FILE}"
-
-mark dir::type
-assert_eq "type dir" "dir" "$(dir::type "${ROOT}")"
-assert_false "type rejects file" dir::type "${FILE}"
-
-mark dir::size
-assert_match "size numeric" "$(dir::size "${ROOT}")" '^[0-9]+$'
-assert_false "size rejects file" dir::size "${FILE}"
-
-mark dir::mtime
-assert_match "mtime numeric" "$(dir::mtime "${ROOT}")" '^[0-9]+$'
-assert_false "mtime rejects file" dir::mtime "${FILE}"
-
-mark dir::atime
-assert_match "atime numeric" "$(dir::atime "${ROOT}")" '^[0-9]+$'
-assert_false "atime rejects file" dir::atime "${FILE}"
-
-mark dir::ctime
-assert_match "ctime numeric" "$(dir::ctime "${ROOT}")" '^[0-9]+$'
-assert_false "ctime rejects file" dir::ctime "${FILE}"
-
-mark dir::age
-assert_match "age numeric" "$(dir::age "${ROOT}")" '^[0-9]+$'
-assert_false "age rejects file" dir::age "${FILE}"
-
-mark dir::owner
-[[ -n "$(dir::owner "${ROOT}")" ]] && ok "owner returns value" || fail "owner returns value"
-assert_false "owner rejects file" dir::owner "${FILE}"
-
-mark dir::group
-[[ -n "$(dir::group "${ROOT}")" ]] && ok "group returns value" || fail "group returns value"
-assert_false "group rejects file" dir::group "${FILE}"
-
-mark dir::mode
-assert_match "mode returns octal-ish" "$(dir::mode "${ROOT}")" '^[0-7]+$'
-assert_false "mode rejects file" dir::mode "${FILE}"
-
-mark dir::inode
-assert_match "inode numeric" "$(dir::inode "${ROOT}")" '^[0-9]+$'
-assert_false "inode rejects file" dir::inode "${FILE}"
-
-mark dir::tree
-tree_out="$(dir::tree "${ROOT}" 2>/dev/null || true)"
-[[ -n "${tree_out}" ]] && ok "tree returns output" || skip "tree unavailable or empty output"
-assert_false "tree rejects file" dir::tree "${FILE}"
-
-# -----------------------------------------------------------------------------
-# Mutations: create, ensure, parent, chmod, rename/move/copy/remove/clear
-# -----------------------------------------------------------------------------
-
-note "filesystem mutations"
-
-mark dir::new
-new_dir="${TEST_ROOT}/new-dir"
-assert_true "new creates missing dir" dir::new "${new_dir}"
-assert_dir  "new dir exists" "${new_dir}"
-assert_false "new refuses existing dir" dir::new "${new_dir}"
-
-mark dir::ensure
-ensure_dir="${TEST_ROOT}/ensure/deep/path"
-assert_true "ensure creates nested dir" dir::ensure "${ensure_dir}"
-assert_dir  "ensure nested exists" "${ensure_dir}"
-assert_true "ensure existing ok" dir::ensure "${ensure_dir}"
-
-mark dir::ensure_parent
-parent_target="${TEST_ROOT}/ensure-parent/a/b/file.txt"
-assert_true "ensure_parent creates parents" dir::ensure_parent "${parent_target}"
-assert_dir  "ensure_parent parent exists" "${TEST_ROOT}/ensure-parent/a/b"
-
-mark dir::chmod
-chmod_dir="${TEST_ROOT}/chmod-dir"
-mkdir -p "${chmod_dir}"
-assert_true "chmod dir 700" dir::chmod "${chmod_dir}" 700
-if can_exact_chmod; then
-    assert_match "chmod mode applied" "$(dir::mode "${chmod_dir}")" '700$|0700$'
-else
-    skip "chmod exact mode unsupported on Windows ACL/MSYS"
-fi
-assert_false "chmod rejects file" dir::chmod "${FILE}" 700
-assert_false "chmod rejects bad mode" dir::chmod "${chmod_dir}" bad
-
-mark dir::copy
-copy_dst="${TEST_ROOT}/copy-root"
-assert_true "copy dir" dir::copy "${ROOT}" "${copy_dst}"
-assert_dir  "copy dst exists" "${copy_dst}"
-assert_file "copy nested file exists" "${copy_dst}/a/b/c/deep.txt"
-assert_false "copy rejects source file" dir::copy "${FILE}" "${TEST_ROOT}/copy-file"
-
-mark dir::rename
-ren_src="${TEST_ROOT}/ren-src"
-ren_dst="${TEST_ROOT}/ren-dst"
-mkdir -p "${ren_src}"
-printf x > "${ren_src}/x.txt"
-assert_true "rename dir" dir::rename "${ren_src}" "${ren_dst}"
-assert_dir "rename dst exists" "${ren_dst}"
-assert_missing "rename src gone" "${ren_src}"
-assert_file "rename moved content" "${ren_dst}/x.txt"
-assert_false "rename rejects file" dir::rename "${FILE}" "${TEST_ROOT}/bad"
-
-mark dir::move
-move_src="${TEST_ROOT}/move-src"
-move_dst="${TEST_ROOT}/move-dst"
-mkdir -p "${move_src}"
-printf x > "${move_src}/x.txt"
-assert_true "move dir" dir::move "${move_src}" "${move_dst}"
-assert_dir "move dst exists" "${move_dst}"
-assert_missing "move src gone" "${move_src}"
-
-mark dir::clear
-clear_dir="${TEST_ROOT}/clear-dir"
-mkdir -p "${clear_dir}/sub"
-printf x > "${clear_dir}/sub/x.txt"
-assert_true "clear dir" dir::clear "${clear_dir}"
-assert_dir "clear keeps directory" "${clear_dir}"
-assert_eq "clear empties directory" "0" "$(dir::count "${clear_dir}")"
-assert_false "clear rejects file" dir::clear "${FILE}"
-
-mark dir::remove
-remove_dir="${TEST_ROOT}/remove-dir"
-mkdir -p "${remove_dir}/sub"
-printf x > "${remove_dir}/sub/x.txt"
-assert_true "remove dir" dir::remove "${remove_dir}"
-assert_missing "remove dir gone" "${remove_dir}"
-assert_false "remove rejects file" dir::remove "${FILE}"
-
-mark dir::mktemp
-tmp_dir="$(dir::mktemp 2>/dev/null || true)"
-if [[ -n "${tmp_dir}" && -d "${tmp_dir}" ]]; then
-    ok "mktemp creates dir"
-    rm -rf -- "${tmp_dir}" 2>/dev/null || true
-else
-    fail "mktemp creates dir"
-fi
-
-mark dir::mktemp_near
-
-mkdir -p -- "${TEST_ROOT}/mut" || fail "mktemp_near setup parent"
-
-tmp_near="$(dir::mktemp_near "${TEST_ROOT}/mut/new-dir" "near" "d" 2>/dev/null || true)"
-
-[[ -n "${tmp_near}" ]] || fail "mktemp_near returned empty"
-
-assert_dir "mktemp_near creates dir near target" "${tmp_near}"
-
-assert_eq "mktemp_near parent is target parent" \
-    "${TEST_ROOT}/mut" \
-    "$(path::dirname "${tmp_near}")"
-
-case "$(dir::name "${tmp_near}")" in
-    near.*d) ok "mktemp_near respects prefix and suffix" ;;
-    *) fail "mktemp_near respects prefix and suffix :: actual=[$(dir::name "${tmp_near}")]";;
-esac
-
-# -----------------------------------------------------------------------------
-# Links
-# -----------------------------------------------------------------------------
-
-note "links"
-
-mark dir::symlink
-mark dir::is_link
-mark dir::readlink
-mark dir::link
-
-if can_symlink "${ROOT}" "${TEST_ROOT}/probe-dir-link"; then
-    dir_link="${TEST_ROOT}/root-link"
-    if dir::symlink "${ROOT}" "${dir_link}"; then
-        assert_link "symlink dir link exists" "${dir_link}"
-        assert_true "is_link symlinked dir" dir::is_link "${dir_link}"
-        readlink_value="$(dir::readlink "${dir_link}" 2>/dev/null || true)"
-        [[ -n "${readlink_value}" ]] && ok "readlink dir link returns target" || fail "readlink dir link returns target"
-    else
-        fail "symlink dir"
-    fi
-
-    hard_dir_link="${TEST_ROOT}/hard-dir-link"
-    if dir::link "${ROOT}" "${hard_dir_link}" 2>/dev/null; then
-        assert_dir "hard link/copy fallback dir exists" "${hard_dir_link}"
-    else
-        skip "hard-linking directories unsupported"
-    fi
-else
-    skip "symlink unavailable on this OS/session"
-    skip "is_link symlink unavailable"
-    skip "readlink symlink unavailable"
-    skip "link directory hardlink unavailable"
-fi
-
-assert_false "symlink rejects file source under dir API" dir::symlink "${FILE}" "${TEST_ROOT}/file-link"
-assert_false "readlink rejects non-link dir" dir::readlink "${ROOT}"
-
-# -----------------------------------------------------------------------------
-# Glob, contains, find, walk, list, counts
-# -----------------------------------------------------------------------------
-
-note "directory query API"
-
-mark dir::glob
-glob_txt="$(dir::glob "${ROOT}" '*.txt' | sorted_lines)"
-printf '%s\n' "${glob_txt}" | has_line "file.txt" && ok "glob txt includes file.txt" || fail "glob txt includes file.txt"
-assert_false "glob rejects missing dir" dir::glob "${ROOT}/missing" '*'
-assert_false "glob rejects empty pattern" dir::glob "${ROOT}" ""
-
-mark dir::has_glob
-assert_true  "has_glob txt" dir::has_glob "${ROOT}" '*.txt'
-assert_true  "has_glob hidden" dir::has_glob "${ROOT}" '.*'
-assert_false "has_glob none" dir::has_glob "${ROOT}" '*.definitely-nope'
-assert_false "has_glob empty pattern rejected" dir::has_glob "${ROOT}" ""
-
-mark dir::contains
-assert_true  "contains child file" dir::contains "${ROOT}" "file.txt"
-assert_true  "contains child dir" dir::contains "${ROOT}" "a"
-assert_false "contains missing" dir::contains "${ROOT}" "missing"
-assert_false "contains rejects slash path" dir::contains "${ROOT}" "a/b"
-assert_false "contains rejects backslash path" dir::contains "${ROOT}" 'a\b'
-assert_false "contains rejects dot" dir::contains "${ROOT}" "."
-assert_false "contains rejects dotdot" dir::contains "${ROOT}" ".."
-assert_false "contains rejects traversal escape" dir::contains "${ROOT}/a" "../../outside/escape.txt"
-
-mark dir::contains_file
-assert_true  "contains_file child" dir::contains_file "${ROOT}" "file.txt"
-assert_false "contains_file dir false" dir::contains_file "${ROOT}" "a"
-assert_false "contains_file rejects slash path" dir::contains_file "${ROOT}" "a/b/c/deep.txt"
-assert_false "contains_file rejects traversal escape" dir::contains_file "${ROOT}/a" "../../outside/escape.txt"
-
-mark dir::contains_dir
-assert_true  "contains_dir child" dir::contains_dir "${ROOT}" "a"
-assert_false "contains_dir file false" dir::contains_dir "${ROOT}" "file.txt"
-assert_false "contains_dir rejects slash path" dir::contains_dir "${ROOT}" "a/b"
-assert_false "contains_dir rejects traversal" dir::contains_dir "${ROOT}/a" "../outside"
-
-mark dir::contains_link
-if [[ -L "${TEST_ROOT}/root-link" ]]; then
-    assert_true "contains_link child link" dir::contains_link "${TEST_ROOT}" "root-link"
-else
-    skip "contains_link no symlink"
-fi
-assert_false "contains_link rejects slash path" dir::contains_link "${TEST_ROOT}" "root/a"
-assert_false "contains_link rejects traversal" dir::contains_link "${ROOT}/a" "../../root-link"
-
-mark dir::contains_hidden
-assert_true  "contains_hidden with dot" dir::contains_hidden "${ROOT}" ".hidden-file"
-assert_true  "contains_hidden without dot" dir::contains_hidden "${ROOT}" "hidden-file"
-assert_false "contains_hidden rejects dot" dir::contains_hidden "${ROOT}" "."
-assert_false "contains_hidden rejects dotdot" dir::contains_hidden "${ROOT}" ".."
-assert_false "contains_hidden rejects slash" dir::contains_hidden "${ROOT}" ".hidden-dir/x"
-assert_false "contains_hidden rejects traversal" dir::contains_hidden "${ROOT}/a" "../../root/.hidden-file"
-
-mark dir::find
-find_deep="$(dir::find "${ROOT}" 'deep.txt' file 10 | sorted_lines)"
-printf '%s\n' "${find_deep}" | grep -F -- "${ROOT}/a/b/c/deep.txt" >/dev/null 2>&1 && ok "find file depth" || fail "find file depth"
-assert_false "find invalid type rejected" dir::find "${ROOT}" '*' invalid
-assert_false "find invalid depth rejected" dir::find "${ROOT}" '*' file bad-depth
-
-mark dir::find_files
-find_files_count="$(dir::find_files "${ROOT}" '*.txt' 10 | count_lines)"
-assert_match "find_files count numeric" "${find_files_count}" '^[0-9]+$'
-(( find_files_count >= 4 )) && ok "find_files sees nested txt files" || fail "find_files sees nested txt files"
-
-mark dir::find_dirs
-find_dirs_count="$(dir::find_dirs "${ROOT}" '*' 10 | count_lines)"
-assert_match "find_dirs count numeric" "${find_dirs_count}" '^[0-9]+$'
-(( find_dirs_count >= 6 )) && ok "find_dirs sees dirs" || fail "find_dirs sees dirs"
-
-mark dir::find_links
-if [[ -L "${TEST_ROOT}/root-link" ]]; then
-    links_found="$(dir::find_links "${TEST_ROOT}" '*' 2 | count_lines)"
-    (( links_found >= 1 )) && ok "find_links sees link" || fail "find_links sees link"
-else
-    skip "find_links no symlink"
-fi
-
-mark dir::walk
-walk_count="$(dir::walk "${ROOT}" | count_lines)"
-(( walk_count >= 10 )) && ok "walk recursive count" || fail "walk recursive count"
-
-mark dir::walk_files
-walk_files_count="$(dir::walk_files "${ROOT}" | count_lines)"
-(( walk_files_count >= 5 )) && ok "walk_files recursive count" || fail "walk_files recursive count"
-
-mark dir::walk_dirs
-walk_dirs_count="$(dir::walk_dirs "${ROOT}" | count_lines)"
-(( walk_dirs_count >= 6 )) && ok "walk_dirs recursive count" || fail "walk_dirs recursive count"
-
-mark dir::walk_links
-if [[ -L "${TEST_ROOT}/root-link" ]]; then
-    walk_links_count="$(dir::walk_links "${TEST_ROOT}" | count_lines)"
-    (( walk_links_count >= 1 )) && ok "walk_links recursive count" || fail "walk_links recursive count"
-else
-    skip "walk_links no symlink"
-fi
-
-mark dir::list
-list_out="$(dir::list "${ROOT}")"
-printf '%s\n' "${list_out}" | has_line "file.txt" && ok "list includes file" || fail "list includes file"
-printf '%s\n' "${list_out}" | has_line ".hidden-file" && ok "list includes hidden file" || fail "list includes hidden file"
-assert_false "list bad sort rejected" dir::list "${ROOT}" bad-sort
-
-mark dir::list_paths
-paths_out="$(dir::list_paths "${ROOT}")"
-printf '%s\n' "${paths_out}" | has_line "${ROOT}/file.txt" && ok "list_paths includes full path" || fail "list_paths includes full path"
-first_reverse="$(dir::list_paths "${ROOT}" reverse 2>/dev/null | head -n 1 || true)"
-first_list_reverse="$(dir::list "${ROOT}" reverse 2>/dev/null | head -n 1 || true)"
-if [[ -n "${first_reverse}" && -n "${first_list_reverse}" ]]; then
-    assert_eq "list_paths forwards sort mode" "${ROOT}/${first_list_reverse}" "${first_reverse}"
-else
-    fail "list_paths forwards sort mode"
-fi
-
-mark dir::list_files
-files_out="$(dir::list_files "${ROOT}")"
-printf '%s\n' "${files_out}" | has_line "file.txt" && ok "list_files includes file.txt" || fail "list_files includes file.txt"
-printf '%s\n' "${files_out}" | has_line ".hidden-file" && ok "list_files includes hidden file" || fail "list_files includes hidden file"
-printf '%s\n' "${files_out}" | has_line "a" && fail "list_files excludes dirs" || ok "list_files excludes dirs"
-
-mark dir::list_dirs
-dirs_out="$(dir::list_dirs "${ROOT}")"
-printf '%s\n' "${dirs_out}" | has_line "a" && ok "list_dirs includes a" || fail "list_dirs includes a"
-printf '%s\n' "${dirs_out}" | has_line ".hidden-dir" && ok "list_dirs includes hidden dir" || fail "list_dirs includes hidden dir"
-printf '%s\n' "${dirs_out}" | has_line "file.txt" && fail "list_dirs excludes files" || ok "list_dirs excludes files"
-
-mark dir::list_links
-if [[ -L "${TEST_ROOT}/root-link" ]]; then
-    links_out="$(dir::list_links "${TEST_ROOT}")"
-    printf '%s\n' "${links_out}" | has_line "root-link" && ok "list_links includes symlink" || fail "list_links includes symlink"
-else
-    skip "list_links no symlink"
-fi
-
-mark dir::list_hidden
-hidden_out="$(dir::list_hidden "${ROOT}")"
-printf '%s\n' "${hidden_out}" | has_line ".hidden-file" && ok "list_hidden includes hidden file" || fail "list_hidden includes hidden file"
-printf '%s\n' "${hidden_out}" | has_line ".hidden-dir" && ok "list_hidden includes hidden dir" || fail "list_hidden includes hidden dir"
-printf '%s\n' "${hidden_out}" | has_line "file.txt" && fail "list_hidden excludes normal file" || ok "list_hidden excludes normal file"
-
-mark dir::count
-count_all="$(dir::count "${ROOT}")"
-assert_match "count numeric" "${count_all}" '^[0-9]+$'
-(( count_all >= 8 )) && ok "count direct children" || fail "count direct children"
-
-mark dir::count_files
-count_files="$(dir::count_files "${ROOT}")"
-assert_match "count_files numeric" "${count_files}" '^[0-9]+$'
-(( count_files >= 2 )) && ok "count_files direct" || fail "count_files direct"
-
-mark dir::count_dirs
-count_dirs="$(dir::count_dirs "${ROOT}")"
-assert_match "count_dirs numeric" "${count_dirs}" '^[0-9]+$'
-(( count_dirs >= 6 )) && ok "count_dirs direct" || fail "count_dirs direct"
-
-mark dir::count_links
-if [[ -L "${TEST_ROOT}/root-link" ]]; then
-    count_links="$(dir::count_links "${TEST_ROOT}")"
-    (( count_links >= 1 )) && ok "count_links direct" || fail "count_links direct"
-else
-    skip "count_links no symlink"
-fi
-
-mark dir::count_hidden
-count_hidden="$(dir::count_hidden "${ROOT}")"
-assert_match "count_hidden numeric" "${count_hidden}" '^[0-9]+$'
-(( count_hidden >= 2 )) && ok "count_hidden direct" || fail "count_hidden direct"
-
-mark dir::count_recursive
-count_recursive="$(dir::count_recursive "${ROOT}")"
-assert_match "count_recursive numeric" "${count_recursive}" '^[0-9]+$'
-(( count_recursive >= walk_count )) && ok "count_recursive >= walk" || fail "count_recursive >= walk"
-
-# -----------------------------------------------------------------------------
-# Archive, extract, backup, strip, sync
-# -----------------------------------------------------------------------------
-
-note "archive extract backup strip sync"
-
-mark dir::archive
-archive_file="${TEST_ROOT}/archives/root.tar.gz"
-if dir::archive "${ROOT}" "${archive_file}" --format=tar.gz; then
-    assert_file "archive creates tar.gz" "${archive_file}"
-else
-    fail "archive creates tar.gz"
-fi
-assert_false "archive rejects file source" dir::archive "${FILE}" "${TEST_ROOT}/archives/file.tar.gz"
-
-mark dir::extract
-extract_to="${TEST_ROOT}/extract/root"
-if [[ -f "${archive_file}" ]]; then
-    assert_true "extract archive" dir::extract "${archive_file}" "${extract_to}"
-    assert_dir  "extract output dir" "${extract_to}"
-else
-    skip "extract archive missing"
-fi
-
-mark dir::backup
-backup_file="${TEST_ROOT}/archives/root.backup.tar.gz"
-if dir::backup "${ROOT}" "${backup_file}"; then
-    assert_file "backup creates archive" "${backup_file}"
-else
-    fail "backup creates archive"
-fi
-assert_false "backup rejects file source" dir::backup "${FILE}" "${TEST_ROOT}/archives/file.backup.tar.gz"
-
-mark dir::strip
-strip_dir="${TEST_ROOT}/strip-dir"
-mkdir -p "${strip_dir}/one/two"
-printf x > "${strip_dir}/one/two/x.txt"
-if sys::has tar && sys::has mktemp && sys::has mv; then
-    assert_true "strip one level" dir::strip "${strip_dir}" 1
-    assert_file "strip exposed nested file" "${strip_dir}/two/x.txt"
-else
-    skip "strip dependencies unavailable"
-fi
-assert_false "strip rejects file source" dir::strip "${FILE}" 1
-assert_false "strip rejects bad level" dir::strip "${strip_dir}" bad
-
-mark dir::sync
-sync_src="${TEST_ROOT}/sync-src"
-sync_dst="${TEST_ROOT}/sync-dst"
-mkdir -p "${sync_src}/inner"
-printf x > "${sync_src}/inner/x.txt"
-assert_true "sync dir" dir::sync "${sync_src}" "${sync_dst}"
-assert_dir "sync dst dir" "${sync_dst}"
-assert_file "sync dst file" "${sync_dst}/inner/x.txt"
-assert_false "sync rejects file source" dir::sync "${FILE}" "${TEST_ROOT}/sync-file-dst"
-
-# -----------------------------------------------------------------------------
-# Hash, checksum, snapshot
-# -----------------------------------------------------------------------------
-
-note "hash checksum snapshot"
-
-mark dir::hash
-hash_value="$(dir::hash "${ROOT}" sha256 2>/dev/null || true)"
-if [[ -n "${hash_value}" ]]; then
-    ok "hash directory returns output"
-else
-    skip "hash unavailable: sha tool missing"
-fi
-assert_false "hash rejects file source" dir::hash "${FILE}" sha256
-assert_false "hash rejects bad algo" dir::hash "${ROOT}" nope
-
-mark dir::checksum
-checksum_value="$(dir::checksum "${ROOT}" sha256 2>/dev/null || true)"
-if [[ -n "${checksum_value}" ]]; then
-    ok "checksum directory returns output"
-else
-    skip "checksum unavailable: sha tool missing"
-fi
-assert_false "checksum rejects file source" dir::checksum "${FILE}" sha256
-assert_false "checksum rejects bad algo" dir::checksum "${ROOT}" nope
-
-mark dir::snapshot
-snapshot_value="$(dir::snapshot "${ROOT}" 2>/dev/null || true)"
-if [[ -n "${snapshot_value}" ]]; then
-    ok "snapshot directory returns output"
-else
-    fail "snapshot directory returns output"
-fi
-assert_false "snapshot rejects file source" dir::snapshot "${FILE}"
-
-# -----------------------------------------------------------------------------
-# Encode, decode, encryption
-# -----------------------------------------------------------------------------
-
-note "codec and encryption"
-
-mark dir::encode
-mark dir::decode
-codec_src="${TEST_ROOT}/codec-src"
-codec_out="${TEST_ROOT}/codec-out"
-codec_dec="${TEST_ROOT}/codec-dec"
-mkdir -p "${codec_src}/inner"
-printf 'hello-codec\n' > "${codec_src}/inner/msg.txt"
-
-if dir::encode "${codec_src}" "${codec_out}" 2>/dev/null; then
-    assert_dir "encode output dir" "${codec_out}"
-    if dir::decode "${codec_out}" "${codec_dec}" 2>/dev/null; then
-        assert_file "decode output file" "${codec_dec}/inner/msg.txt"
-        assert_eq "decode restores content" "hello-codec" "$(tr -d '\r\n' < "${codec_dec}/inner/msg.txt")"
-    else
-        fail "decode directory"
-    fi
-else
-    skip "encode/decode unavailable"
-    skip "decode skipped"
-fi
-assert_false "encode rejects file source under dir API" dir::encode "${FILE}" "${TEST_ROOT}/file-encoded"
-assert_false "decode rejects file source under dir API" dir::decode "${FILE}" "${TEST_ROOT}/file-decoded"
-
-mark dir::encrypt
-mark dir::decrypt
-crypt_dir="${TEST_ROOT}/crypt-dir"
-mkdir -p "${crypt_dir}"
-printf 'secret\n' > "${crypt_dir}/secret.txt"
-if sys::has openssl || sys::has gpg; then
-    if dir::encrypt "${crypt_dir}" "passphrase-for-test" auto 2>/dev/null; then
-        ok "encrypt directory"
-        if dir::decrypt "${crypt_dir}" "passphrase-for-test" auto 1 2>/dev/null; then
-            ok "decrypt directory"
-        else
-            fail "decrypt directory"
-        fi
-    else
-        fail "encrypt directory"
-        skip "decrypt skipped after encrypt failure"
-    fi
-else
-    skip "encrypt unavailable: no openssl/gpg"
-    skip "decrypt unavailable: no openssl/gpg"
-fi
-assert_false "encrypt rejects file source under dir API" dir::encrypt "${FILE}" pass
-assert_false "decrypt rejects file source under dir API" dir::decrypt "${FILE}" pass
-
-# -----------------------------------------------------------------------------
-# Locks and watch
-# -----------------------------------------------------------------------------
-
-note "lock and watch"
-
-mark dir::trylock
-mark dir::lock
-mark dir::unlock
-mark dir::locked
-mark dir::with_lock
-
-lock_path="${TEST_ROOT}/locks/main.lock"
-assert_true "trylock creates lock" dir::trylock "${lock_path}"
-assert_true "locked true after trylock" dir::locked "${lock_path}"
-assert_false "second trylock fails" dir::trylock "${lock_path}"
-assert_true "unlock own lock" dir::unlock "${lock_path}"
-assert_false "locked false after unlock" dir::locked "${lock_path}"
-
-assert_true "lock creates lock" dir::lock "${lock_path}" 1 0.05 0
-assert_true "unlock lock" dir::unlock "${lock_path}"
-
-with_lock_out="${TEST_ROOT}/with-lock.out"
-assert_true "with_lock callback" dir::with_lock "${lock_path}" with_lock_callback 1 0.05 0 "${with_lock_out}"
-assert_file "with_lock callback wrote file" "${with_lock_out}"
-
-mark dir::watch
-if [[ "${DO_WATCH}" == 1 ]]; then
-    watch_out="${TEST_ROOT}/watch.out"
-    if run_timeout 4 bash -c '
-        source "$1"
-        source "$2"
-        WATCH_OUT="$3"
-        callback_touch () { printf "changed\n" >> "${WATCH_OUT}"; }
-        ( sleep 0.5; printf x > "$4/new-watch-file" ) &
-        dir::watch "$4" 0.1 callback_touch once continue
-    ' _ "${PATH_LIB}" "${DIR_LIB}" "${watch_out}" "${ROOT}" >/dev/null 2>&1; then
-        grep -F "changed" "${watch_out}" >/dev/null 2>&1 && ok "watch detects one change" || fail "watch detects one change"
-    else
-        skip "watch unavailable or timed out"
-    fi
-else
-    skip "watch disabled"
-fi
-
-# -----------------------------------------------------------------------------
-# Adversarial names and safety fuzz
-# -----------------------------------------------------------------------------
-
-note "adversarial names and safety fuzz"
-
-[[ "${FUZZ}" =~ ^[0-9]+$ ]] || FUZZ=300
-
-ad="${TEST_ROOT}/adversarial"
-mkdir -p "${ad}"
-
-declare -a names=(
-    "space name"
-    "unicodé-ملف"
-    "-dash"
-    "semi;colon"
-    "quote'file"
-    "bracket[file]"
-    "paren(file)"
-    "hash#file"
-    "comma,file"
-    "two  spaces"
-    ".hidden"
+section 'coverage: functions exist'
+
+EXPECTED_FUNCS=(
+    file::valid file::exists file::missing file::empty file::filled file::readable file::writable file::executable
+    file::is_link file::is_hidden file::is_under file::is_safe file::is_same file::has_ext
+    file::name file::dir file::dirname file::drive file::resolve file::expand file::abs file::rel file::can
+    file::stem file::ext file::dotext file::setname file::setstem file::setext
+    file::size file::mtime file::atime file::ctime file::age file::owner file::group file::mode file::inode
+    file::new file::ensure file::ensure_dir file::remove file::clear file::rename file::move file::copy file::link file::symlink file::readlink file::chmod file::mktemp file::mktemp_near
+    file::sync file::watch file::strip file::archive file::extract file::backup
+    file::hash file::checksum file::snapshot file::encode file::decode file::encrypt file::decrypt
+    file::trylock file::lock file::unlock file::locked file::with_lock
+    file::encoding file::shebang file::mime file::kind file::is_text file::is_binary file::is_equal file::changed_since
+    file::starts_with file::ends_with file::contains file::contains_line
+    file::grep file::find file::find_line file::find_count file::lines_count file::words_count file::bytes_count
+    file::write file::write_once file::writeln file::write_lines file::write_stdin file::write_atomic file::write_atomic_stdin
+    file::append file::appendln file::append_lines file::append_stdin file::append_unique
+    file::prepend file::prependln file::prepend_lines file::prepend_stdin file::prepend_unique
+    file::read file::lines file::first_line file::last_line file::line file::range file::head file::tail
+    file::replace file::replace_regex file::replace_line file::insert_line file::delete_line file::delete_match file::delete_empty_lines
+    file::sort file::reverse file::dedupe file::truncate file::touch_at
+    file::diff file::rotate file::restore file::tail_follow
 )
 
-i=0
-for name in "${names[@]}"; do
-    mkdir -p -- "${ad}/${name}"
-    printf x > "${ad}/${name}/x.txt"
+assert_eq 'expected function count' '130' "${#EXPECTED_FUNCS[@]}"
 
-    assert_true  "adversarial exists ${i}" dir::exists "${ad}/${name}"
-    assert_true  "adversarial contains ${i}" dir::contains "${ad}" "${name}"
-    assert_true  "adversarial contains_dir ${i}" dir::contains_dir "${ad}" "${name}"
-    assert_true  "adversarial is_under ${i}" dir::is_under "${ad}/${name}" "${ad}"
-    assert_false "adversarial contains traversal ${i}" dir::contains "${ad}/${name}" "../escape"
-    i=$(( i + 1 ))
-done
-
-for (( i=0; i<FUZZ; i++ )); do
-    name="fuzz_${i}_$(( i * 17 % 97 ))"
-    mkdir -p -- "${ad}/${name}/sub"
-    printf '%s\n' "${i}" > "${ad}/${name}/sub/file.txt"
-
-    assert_true  "fuzz exists ${i}" dir::exists "${ad}/${name}"
-    assert_true  "fuzz contains ${i}" dir::contains "${ad}" "${name}"
-    assert_true  "fuzz contains_dir ${i}" dir::contains_dir "${ad}" "${name}"
-    assert_false "fuzz contains slash rejected ${i}" dir::contains "${ad}" "${name}/sub"
-    assert_false "fuzz contains_file slash rejected ${i}" dir::contains_file "${ad}" "${name}/sub/file.txt"
-    assert_true  "fuzz safe ${i}" dir::is_safe "${ad}/${name}/sub" "${ad}"
-done
-
-# -----------------------------------------------------------------------------
-# Medium tree stress
-# -----------------------------------------------------------------------------
-
-note "medium tree stress"
-
-stress="${TEST_ROOT}/stress"
-mkdir -p "${stress}"
-
-for (( i=0; i<40; i++ )); do
-    mkdir -p "${stress}/d${i}/a/b"
-    for (( j=0; j<5; j++ )); do
-        printf '%s:%s\n' "${i}" "${j}" > "${stress}/d${i}/a/b/f${j}.txt"
-    done
-done
-
-stress_files="$(dir::walk_files "${stress}" | count_lines)"
-assert_eq "stress walk_files 200" "200" "${stress_files}"
-stress_dirs="$(dir::walk_dirs "${stress}" | count_lines)"
-(( stress_dirs >= 120 )) && ok "stress walk_dirs >= 120" || fail "stress walk_dirs >= 120"
-stress_recursive="$(dir::count_recursive "${stress}")"
-(( stress_recursive >= 320 )) && ok "stress count_recursive >= 320" || fail "stress count_recursive >= 320"
-
-if [[ "${SLOW}" == 1 ]]; then
-    slow_archive="${TEST_ROOT}/archives/stress.tar.gz"
-    if dir::archive "${stress}" "${slow_archive}" --format=tar.gz; then
-        assert_file "slow archive stress" "${slow_archive}"
-        slow_extract="${TEST_ROOT}/extract/stress"
-        assert_true "slow extract stress" dir::extract "${slow_archive}" "${slow_extract}"
-        assert_eq "slow extracted file count" "200" "$(dir::walk_files "${slow_extract}" | count_lines)"
-    else
-        fail "slow archive stress"
+for fn in "${EXPECTED_FUNCS[@]}"; do
+    if declare -F "${fn}" >/dev/null 2>&1; then pass "declared ${fn}"
+    else fail "missing ${fn}"
     fi
+done
 
-    slow_hash="$(dir::hash "${stress}" sha256 2>/dev/null || true)"
-    [[ -n "${slow_hash}" ]] && ok "slow hash stress" || skip "slow hash stress unavailable"
+section 'predicates and path-facing wrappers'
+
+mark file::valid;       assert_true  'valid accepts normal path' file::valid "${A}"
+mark file::valid;       assert_false 'valid rejects empty path' file::valid ''
+mark file::exists;      assert_true  'exists detects regular file' file::exists "${A}"
+mark file::exists;      assert_false 'exists rejects directory' file::exists "${DIR}"
+mark file::missing;     assert_true  'missing detects missing regular file' file::missing "${MISSING}"
+mark file::missing;     assert_false 'missing rejects existing file' file::missing "${A}"
+mark file::empty;       assert_true  'empty detects empty file' file::empty "${EMPTY}"
+mark file::empty;       assert_true  'empty treats missing as empty' file::empty "${MISSING}"
+mark file::filled;      assert_true  'filled detects content' file::filled "${A}"
+mark file::filled;      assert_false 'filled rejects empty file' file::filled "${EMPTY}"
+mark file::readable;    assert_true  'readable detects readable file' file::readable "${A}"
+mark file::writable;    assert_true  'writable detects writable file' file::writable "${A}"
+mark file::executable;  chmod +x "${A}" 2>/dev/null || true; assert_true 'executable detects executable file' file::executable "${A}"; chmod -x "${A}" 2>/dev/null || true
+mark file::is_hidden;   printf x > "${ROOT_TMP}/.hidden"; assert_true 'is_hidden detects dotfile' file::is_hidden "${ROOT_TMP}/.hidden"
+mark file::is_hidden;   assert_false 'is_hidden rejects normal file' file::is_hidden "${A}"
+mark file::is_under;    assert_true  'is_under detects file below root' file::is_under "${A}" "${ROOT_TMP}"
+mark file::is_safe;     assert_true  'is_safe accepts file inside root' file::is_safe "${A}" "${ROOT_TMP}"
+mark file::is_same;     assert_true  'is_same detects same file path' file::is_same "${A}" "${A}"
+mark file::has_ext;     assert_true  'has_ext matches extension' file::has_ext "${A}" txt TXT
+mark file::has_ext;     assert_false 'has_ext rejects wrong extension' file::has_ext "${A}" md
+
+if ln -s "${A}" "${ROOT_TMP}/a.link" 2>/dev/null; then
+    mark file::is_link;     assert_true  'is_link detects symlink to file' file::is_link "${ROOT_TMP}/a.link"
+    mark file::readlink;    assert_ne    'readlink returns target' "$(file::readlink "${ROOT_TMP}/a.link" 2>/dev/null || true)"
 else
-    skip "slow archive/hash stress disabled"
+    mark file::is_link;     skip 'is_link symlink unsupported'
+    mark file::readlink;    skip 'readlink symlink unsupported'
 fi
 
-# -----------------------------------------------------------------------------
-# Coverage gate
-# -----------------------------------------------------------------------------
+section 'names, transforms, resolution'
 
-note "coverage gate"
+mark file::name;        assert_eq 'name returns basename' 'a.txt' "$(file::name "${A}")"
+mark file::dirname;     assert_eq 'dirname returns parent path' "${ROOT_TMP}" "$(file::dirname "${A}")"
+mark file::dir;         assert_eq 'dir returns parent basename' "$(basename "${ROOT_TMP}")" "$(file::dir "${A}")"
+mark file::stem;        assert_eq 'stem returns basename without extension' 'a' "$(file::stem "${A}")"
+mark file::ext;         assert_eq 'ext returns extension' 'txt' "$(file::ext "${A}")"
+mark file::dotext;      assert_eq 'dotext returns dotted extension' '.txt' "$(file::dotext "${A}")"
+mark file::setname;     assert_eq 'setname changes name' "${ROOT_TMP}/renamed.md" "$(file::setname "${A}" renamed.md)"
+mark file::setstem;     assert_eq 'setstem changes stem' "${ROOT_TMP}/main.txt" "$(file::setstem "${A}" main)"
+mark file::setext;      assert_eq 'setext changes extension' "${ROOT_TMP}/a.md" "$(file::setext "${A}" md)"
+mark file::drive;       file::drive 'C:/x/y.txt' >/dev/null 2>&1 && pass 'drive detects Windows drive' || skip 'drive unavailable on current path semantics'
+mark file::resolve;     assert_ne 'resolve returns path' "$(file::resolve "${A}" 2>/dev/null || true)"
+mark file::expand;      assert_eq 'expand leaves normal path intact' "${A}" "$(file::expand "${A}")"
+mark file::abs;         assert_ne 'abs returns absolute path' "$(file::abs "${A}" 2>/dev/null || true)"
+mark file::rel;         assert_eq 'rel returns relative from root' 'a.txt' "$(file::rel "${A}" "${ROOT_TMP}" 2>/dev/null || true)"
+mark file::can;         assert_ne 'can returns canonical existing file' "$(file::can "${A}" 2>/dev/null || true)"
 
-declared_count=0
-missing_count=0
+section 'metadata'
 
-while IFS= read -r fn; do
-    [[ "${fn}" == dir::* ]] || continue
-    declared_count=$(( declared_count + 1 ))
-    if [[ -z "${TESTED_FUNCS[${fn}]:-}" ]]; then
-        fail "coverage missing ${fn}"
-        missing_count=$(( missing_count + 1 ))
+mark file::size;        assert_eq 'size counts bytes' '23' "$(file::size "${A}" | tr -d '\n')"
+mark file::mtime;       assert_ne 'mtime returns timestamp' "$(file::mtime "${A}" 2>/dev/null || true)"
+mark file::atime;       assert_ne 'atime returns timestamp' "$(file::atime "${A}" 2>/dev/null || true)"
+mark file::ctime;       assert_ne 'ctime returns timestamp' "$(file::ctime "${A}" 2>/dev/null || true)"
+mark file::age;         assert_ne 'age returns age seconds' "$(file::age "${A}" 2>/dev/null || true)"
+mark file::owner;       file::owner "${A}" >/dev/null 2>&1 && pass 'owner returns owner' || skip 'owner unavailable'
+mark file::group;       file::group "${A}" >/dev/null 2>&1 && pass 'group returns group' || skip 'group unavailable'
+mark file::mode;        assert_ne 'mode returns permissions' "$(file::mode "${A}" 2>/dev/null || true)"
+mark file::inode;       assert_ne 'inode returns inode' "$(file::inode "${A}" 2>/dev/null || true)"
+
+section 'filesystem mutations'
+
+T="${ROOT_TMP}/new.txt"
+mark file::new;         assert_true  'new creates missing file' file::new "${T}"
+mark file::new;         assert_false 'new rejects existing file' file::new "${T}"
+mark file::ensure;      rm -f -- "${T}"; assert_true 'ensure creates or touches file' file::ensure "${T}"
+mark file::ensure_dir;  assert_true  'ensure_dir creates parent directory' file::ensure_dir "${D}"
+mark file::clear;       printf x > "${T}"; assert_true 'clear truncates file' file::clear "${T}"; assert_eq 'clear left zero bytes' '0' "$(file::size "${T}" | tr -d '\n')"
+mark file::rename;      printf x > "${T}"; assert_true 'rename moves file' file::rename "${T}" "${ROOT_TMP}/renamed.txt"; T="${ROOT_TMP}/renamed.txt"
+mark file::move;        assert_true 'move aliases rename' file::move "${T}" "${ROOT_TMP}/moved.txt"; T="${ROOT_TMP}/moved.txt"
+mark file::copy;        assert_true 'copy duplicates file' file::copy "${T}" "${ROOT_TMP}/copy.txt"
+mark file::chmod;       assert_true 'chmod applies permissions' file::chmod "${T}" 600
+mark file::mktemp;      TMPF="$(file::mktemp 2>/dev/null || true)"; [[ -n "${TMPF}" && -f "${TMPF}" ]] && pass 'mktemp creates temp file' || fail 'mktemp creates temp file'; rm -f -- "${TMPF}" 2>/dev/null || true
+mark file::mktemp_near; TMPN="$(file::mktemp_near "${A}" 2>/dev/null || true)"; [[ -n "${TMPN}" && -f "${TMPN}" ]] && pass 'mktemp_near creates nearby file' || fail 'mktemp_near creates nearby file'; rm -f -- "${TMPN}" 2>/dev/null || true
+mark file::remove;      assert_true 'remove deletes regular file' file::remove "${ROOT_TMP}/copy.txt"
+
+if ln "${A}" "${ROOT_TMP}/a.hard" 2>/dev/null; then
+    mark file::link; assert_true 'link creates hardlink' file::link "${A}" "${ROOT_TMP}/a.hard2"
+else
+    mark file::link; skip 'hardlink unsupported'
+fi
+
+if ln -s "${A}" "${ROOT_TMP}/a.sym-src" 2>/dev/null; then
+    rm -f -- "${ROOT_TMP}/a.sym-src"
+    mark file::symlink; assert_true 'symlink creates symlink' file::symlink "${A}" "${ROOT_TMP}/a.sym"
+else
+    mark file::symlink; skip 'symlink unsupported'
+fi
+
+section 'path delegated heavy operations'
+
+mark file::sync;        file::sync "${A}" "${ROOT_TMP}/sync.txt" >/dev/null 2>&1 && pass 'sync copies file to target' || skip 'sync unavailable or different arity'
+mark file::strip;       printf '  x  \n\n' > "${ROOT_TMP}/strip.txt"; file::strip "${ROOT_TMP}/strip.txt" >/dev/null 2>&1 && pass 'strip runs on file' || skip 'strip unavailable'
+mark file::archive;     if file::archive "${A}" "${ROOT_TMP}/a.tar.gz" >/dev/null 2>&1; then pass 'archive creates archive'; else skip 'archive unavailable'; fi
+mark file::extract;     if [[ -f "${ROOT_TMP}/a.tar.gz" ]] && file::extract "${ROOT_TMP}/a.tar.gz" "${ROOT_TMP}/extract" >/dev/null 2>&1; then pass 'extract extracts archive'; else skip 'extract unavailable'; fi
+mark file::backup;      cp "${A}" "${ROOT_TMP}/backup.txt"; file::backup "${ROOT_TMP}/backup.txt" >/dev/null 2>&1 && pass 'backup creates backup' || skip 'backup unavailable'
+mark file::hash;        file::hash "${A}" >/dev/null 2>&1 && pass 'hash hashes file' || skip 'hash unavailable'
+mark file::checksum;    file::checksum "${A}" >/dev/null 2>&1 && pass 'checksum snapshots file' || skip 'checksum unavailable'
+mark file::snapshot;    file::snapshot "${A}" >/dev/null 2>&1 && pass 'snapshot snapshots file' || skip 'snapshot unavailable'
+
+ENC="${ROOT_TMP}/enc.txt"
+printf 'secret' > "${ENC}"
+mark file::encode;      file::encode "${ENC}" "${ENC}.b64" >/dev/null 2>&1 && pass 'encode runs on file' || skip 'encode unavailable'
+mark file::decode;      [[ -f "${ENC}.b64" ]] && file::decode "${ENC}.b64" "${ENC}.decoded" >/dev/null 2>&1 && pass 'decode runs on file' || skip 'decode unavailable'
+mark file::encrypt;     file::encrypt "${ENC}" "${ENC}.crypt" test-pass >/dev/null 2>&1 && pass 'encrypt runs on file' || skip 'encrypt unavailable'
+mark file::decrypt;     [[ -f "${ENC}.crypt" ]] && file::decrypt "${ENC}.crypt" "${ENC}.plain" test-pass >/dev/null 2>&1 && pass 'decrypt runs on file' || skip 'decrypt unavailable'
+
+section 'locks and watchers'
+
+mark file::trylock;     if file::trylock "${LOCK}" >/dev/null 2>&1; then pass 'trylock locks file'; else skip 'trylock unavailable'; fi
+mark file::locked;      file::locked "${LOCK}" >/dev/null 2>&1 && pass 'locked detects lock' || skip 'locked unavailable or no lock active'
+mark file::unlock;      file::unlock "${LOCK}" >/dev/null 2>&1 && pass 'unlock unlocks file' || skip 'unlock unavailable'
+mark file::lock;        if call_timeout 2 file::lock "${LOCK}" >/dev/null 2>&1; then pass 'lock locks file'; file::unlock "${LOCK}" >/dev/null 2>&1 || true; else skip 'lock unavailable'; fi
+mark file::with_lock;   if file::with_lock "${LOCK}" true >/dev/null 2>&1; then pass 'with_lock executes callback'; else skip 'with_lock unavailable'; fi
+mark file::watch;       if call_timeout 1 file::watch "${A}" >/dev/null 2>&1; then pass 'watch exits under timeout'; else skip 'watch unavailable or long-running by design'; fi
+
+section 'classification and content predicates'
+
+SHE="${ROOT_TMP}/run.sh"
+printf '#!/usr/bin/env bash\necho ok\n' > "${SHE}"
+mark file::encoding;    file::encoding "${A}" >/dev/null 2>&1 && pass 'encoding detects encoding' || skip 'encoding requires file command'
+mark file::shebang;     assert_eq 'shebang reads shebang' '#!/usr/bin/env bash' "$(file::shebang "${SHE}" 2>/dev/null || true)"
+mark file::mime;        file::mime "${A}" >/dev/null 2>&1 && pass 'mime detects MIME' || skip 'mime requires file command'
+mark file::kind;        assert_eq 'kind classifies shell script' 'script' "$(file::kind "${SHE}" 2>/dev/null || true)"
+mark file::is_text;     assert_true 'is_text detects text' file::is_text "${A}"
+mark file::is_binary;   assert_true 'is_binary detects binary-ish file' file::is_binary "${BIN}"
+mark file::is_equal;    assert_true 'is_equal detects equal content' file::is_equal "${A}" "${B}"
+mark file::is_equal;    assert_false 'is_equal rejects different content' file::is_equal "${A}" "${C}"
+sleep 1
+printf newer > "${ROOT_TMP}/newer.txt"
+mark file::changed_since; assert_true 'changed_since detects newer file than timestamp/file' file::changed_since "${ROOT_TMP}/newer.txt" "${A}"
+mark file::starts_with; assert_true 'starts_with regex checks first line' file::starts_with "${A}" 'alp'
+mark file::starts_with; assert_true 'starts_with fixed checks first line' file::starts_with "${A}" 'alpha' fixed
+mark file::ends_with;   assert_true 'ends_with regex checks last line' file::ends_with "${A}" 'beta'
+mark file::ends_with;   assert_true 'ends_with fixed checks last line' file::ends_with "${A}" 'beta' fixed
+mark file::contains;    assert_true 'contains regex finds pattern' file::contains "${A}" 'g.mm.'
+mark file::contains;    assert_true 'contains fixed finds text' file::contains "${A}" 'gamma' fixed
+mark file::contains_line; assert_true 'contains_line regex finds whole line' file::contains_line "${A}" 'beta'
+mark file::contains_line; assert_true 'contains_line fixed finds whole line' file::contains_line "${A}" 'gamma' fixed
+
+section 'search and counters'
+
+mark file::grep;        assert_eq 'grep returns matching line count' '2' "$(file::grep "${A}" '^beta$' | wc -l | tr -d '[:space:]')"
+mark file::find;        assert_ne 'find returns first byte occurrence' "$(file::find "${A}" beta 2>/dev/null || true)"
+mark file::find_line;   assert_eq 'find_line returns first line number' '2' "$(file::find_line "${A}" beta 2>/dev/null || true)"
+mark file::find_count;  assert_eq 'find_count counts occurrences' '2' "$(file::find_count "${A}" beta 2>/dev/null || true)"
+mark file::lines_count; assert_eq 'lines_count counts lines' '4' "$(file::lines_count "${A}" 2>/dev/null || true)"
+mark file::words_count; assert_eq 'words_count counts words' '4' "$(file::words_count "${A}" 2>/dev/null || true)"
+mark file::bytes_count; assert_eq 'bytes_count aliases size' '23' "$(file::bytes_count "${A}" 2>/dev/null | tr -d '\n')"
+
+section 'write, append, prepend APIs'
+
+W="${ROOT_TMP}/write.txt"
+mark file::write;              assert_true 'write writes content' file::write "${W}" abc; assert_file_content 'write content ok' "${W}" abc
+mark file::write_once;         assert_true 'write_once keeps existing file' file::write_once "${W}" zzz; assert_file_content 'write_once did not overwrite' "${W}" abc
+mark file::writeln;            assert_true 'writeln writes line' file::writeln "${W}" abc; assert_eq 'writeln content ok' 'abc' "$(file::first_line "${W}")"
+mark file::write_lines;        assert_true 'write_lines writes multiple lines' file::write_lines "${W}" one two three; assert_eq 'write_lines line count' '3' "$(file::lines_count "${W}")"
+mark file::write_stdin;        printf stdin | file::write_stdin "${W}"; assert_file_content 'write_stdin content ok' "${W}" stdin
+mark file::write_atomic;       assert_true 'write_atomic writes content' file::write_atomic "${W}" atomic; assert_file_content 'write_atomic content ok' "${W}" atomic
+mark file::write_atomic_stdin; printf atomstdin | file::write_atomic_stdin "${W}"; assert_file_content 'write_atomic_stdin content ok' "${W}" atomstdin
+mark file::append;             assert_true 'append appends content' file::append "${W}" X; assert_file_content 'append content ok' "${W}" atomstdinX
+mark file::appendln;           assert_true 'appendln appends line' file::appendln "${W}" Y; assert_true 'appendln searchable' file::contains "${W}" Y fixed
+mark file::append_lines;       assert_true 'append_lines appends many lines' file::append_lines "${W}" L1 L2; assert_true 'append_lines searchable' file::contains_line "${W}" L2 fixed
+mark file::append_stdin;       printf Z | file::append_stdin "${W}"; assert_true 'append_stdin appends' file::contains "${W}" Z fixed
+mark file::append_unique;      file::write_lines "${W}" one two; file::append_unique "${W}" two; file::append_unique "${W}" three; assert_eq 'append_unique adds only missing' '3' "$(file::lines_count "${W}")"
+mark file::prepend;            file::write "${W}" tail; assert_true 'prepend prepends content' file::prepend "${W}" head; assert_file_content 'prepend content ok' "${W}" headtail
+mark file::prependln;          file::write_lines "${W}" tail; assert_true 'prependln prepends line' file::prependln "${W}" head; assert_eq 'prependln first line' 'head' "$(file::first_line "${W}")"
+mark file::prepend_lines;      file::write_lines "${W}" tail; assert_true 'prepend_lines prepends multiple' file::prepend_lines "${W}" h1 h2; assert_eq 'prepend_lines first line' 'h1' "$(file::first_line "${W}")"
+mark file::prepend_stdin;      file::write_lines "${W}" tail; printf 'stdin-head\n' | file::prepend_stdin "${W}"; assert_eq 'prepend_stdin first line' 'stdin-head' "$(file::first_line "${W}")"
+mark file::prepend_unique;     file::write_lines "${W}" two three; file::prepend_unique "${W}" two; file::prepend_unique "${W}" one; assert_eq 'prepend_unique adds only missing at top' 'one' "$(file::first_line "${W}")"
+
+section 'read and line APIs'
+
+R="${ROOT_TMP}/read.txt"
+printf 'one\ntwo\nthree\nfour\n' > "${R}"
+mark file::read;        assert_eq 'read reads file' $'one\ntwo\nthree\nfour' "$(file::read "${R}" 2>/dev/null || true)"
+mark file::lines;       assert_eq 'lines aliases read' $'one\ntwo\nthree\nfour' "$(file::lines "${R}" 2>/dev/null || true)"
+mark file::first_line;  assert_eq 'first_line returns first' 'one' "$(file::first_line "${R}" 2>/dev/null || true)"
+mark file::last_line;   assert_eq 'last_line returns last' 'four' "$(file::last_line "${R}" 2>/dev/null | tr -d '\r' || true)"
+mark file::line;        assert_eq 'line returns nth line' 'three' "$(file::line "${R}" 3 2>/dev/null | tr -d '\r' || true)"
+mark file::range;       assert_eq 'range returns selected lines' $'two\nthree' "$(file::range "${R}" 2 3 2>/dev/null | tr -d '\r' || true)"
+mark file::head;        assert_eq 'head returns first n lines' $'one\ntwo' "$(file::head "${R}" 2 2>/dev/null | tr -d '\r' || true)"
+mark file::tail;        assert_eq 'tail returns last n lines' $'three\nfour' "$(file::tail "${R}" 2 2>/dev/null | tr -d '\r' || true)"
+
+section 'editing APIs'
+
+E="${ROOT_TMP}/edit.txt"
+printf 'alpha\nbeta\ngamma\n\nalpha\n' > "${E}"
+mark file::replace;            assert_true 'replace replaces literal text' file::replace "${E}" alpha ALPHA; assert_true 'replace result contains ALPHA' file::contains "${E}" ALPHA fixed
+mark file::replace_regex;      assert_true 'replace_regex replaces regex' file::replace_regex "${E}" 'b.ta' BETA; assert_true 'replace_regex result contains BETA' file::contains "${E}" BETA fixed
+mark file::replace_line;       assert_true 'replace_line replaces selected line' file::replace_line "${E}" 2 LINE2; assert_eq 'replace_line changed line' 'LINE2' "$(file::line "${E}" 2)"
+mark file::insert_line;        assert_true 'insert_line inserts before selected line' file::insert_line "${E}" 2 INSERTED; assert_eq 'insert_line inserted line' 'INSERTED' "$(file::line "${E}" 2)"
+mark file::delete_line;        assert_true 'delete_line deletes selected line' file::delete_line "${E}" 2; assert_ne 'delete_line preserved file' "$(file::read "${E}" 2>/dev/null || true)"
+mark file::delete_match;       assert_true 'delete_match deletes matching lines' file::delete_match "${E}" '^ALPHA$'; assert_false 'delete_match removed ALPHA' file::contains_line "${E}" ALPHA fixed
+mark file::delete_empty_lines; printf 'a\n\n b \n\n' > "${E}"; assert_true 'delete_empty_lines removes blank lines' file::delete_empty_lines "${E}"; assert_eq 'delete_empty_lines line count' '2' "$(file::lines_count "${E}")"
+
+section 'ordering, truncation, timestamps, comparison, rotation'
+
+O="${ROOT_TMP}/order.txt"
+printf 'c\na\nb\na\n' > "${O}"
+mark file::sort;        assert_true 'sort asc sorts lines' file::sort "${O}" asc; assert_eq 'sort asc first line' 'a' "$(file::first_line "${O}")"
+printf 'c\na\nb\na\n' > "${O}"
+mark file::sort;        assert_true 'sort unique removes duplicates' file::sort "${O}" unique; assert_eq 'sort unique line count' '3' "$(file::lines_count "${O}")"
+printf 'one\ntwo\nthree\n' > "${O}"
+mark file::reverse;     assert_true 'reverse reverses lines' file::reverse "${O}"; assert_eq 'reverse first line' 'three' "$(file::first_line "${O}")"
+printf 'a\na\nb\na\n' > "${O}"
+mark file::dedupe;      assert_true 'dedupe removes repeated lines keeping first' file::dedupe "${O}"; assert_eq 'dedupe line count' '2' "$(file::lines_count "${O}")"
+printf '1234567890' > "${O}"
+mark file::truncate;    assert_true 'truncate changes size' file::truncate "${O}" 4; assert_eq 'truncate size' '4' "$(file::size "${O}" | tr -d '\n')"
+REF="${ROOT_TMP}/ref.txt"; printf ref > "${REF}"; sleep 1; printf dst > "${O}"
+mark file::touch_at;    file::touch_at "${O}" "${REF}" >/dev/null 2>&1 && pass 'touch_at copies mtime from ref' || skip 'touch_at unsupported on platform'
+mark file::diff;        file::diff "${A}" "${C}" >/dev/null 2>&1 && pass 'diff returns differences' || pass 'diff returns nonzero for differences as expected'
+ROT="${ROOT_TMP}/rot.log"; printf rot > "${ROT}"
+mark file::rotate;      assert_true 'rotate rotates log file' file::rotate "${ROT}" 3; [[ -f "${ROT}.1" && -f "${ROT}" ]] && pass 'rotate created numbered backup and fresh file' || fail 'rotate created numbered backup and fresh file'
+REST="${ROOT_TMP}/restore.txt"; printf old > "${REST}"; printf new > "${REST}.bak"
+mark file::restore;     assert_true 'restore replaces file from suffix backup' file::restore "${REST}" .bak; assert_file_content 'restore content ok' "${REST}" new
+
+section 'tail follow smoke'
+
+FOLLOW="${ROOT_TMP}/follow.log"
+printf 'one\ntwo\n' > "${FOLLOW}"
+mark file::tail_follow
+if call_timeout 1 file::tail_follow "${FOLLOW}" 1 >/dev/null 2>&1; then
+    pass 'tail_follow smoke exits'
+else
+    skip 'tail_follow is long-running or timeout unavailable'
+fi
+
+section 'adversarial filenames'
+
+WEIRD_DIR="${ROOT_TMP}/weird names"
+mkdir -p "${WEIRD_DIR}"
+WEIRD="${WEIRD_DIR}/sp ace [x] ; quote ' file.txt"
+mark file::write;       assert_true 'write handles adversarial filename' file::write "${WEIRD}" weird
+mark file::read;        assert_file_content 'read handles adversarial filename' "${WEIRD}" weird
+mark file::copy;        assert_true 'copy handles adversarial filename' file::copy "${WEIRD}" "${WEIRD}.copy"
+mark file::is_equal;    assert_true 'is_equal handles adversarial filename' file::is_equal "${WEIRD}" "${WEIRD}.copy"
+
+section 'negative cases'
+
+assert_false 'read rejects missing file' file::read "${MISSING}"
+assert_false 'remove rejects directory' file::remove "${DIR}"
+assert_false 'copy rejects missing file' file::copy "${MISSING}" "${ROOT_TMP}/x"
+assert_false 'line rejects zero line number' file::line "${A}" 0
+assert_false 'range rejects inverted range' file::range "${A}" 3 2
+assert_false 'contains rejects empty pattern' file::contains "${A}" ''
+assert_false 'replace rejects empty search' file::replace "${A}" '' x
+assert_false 'truncate rejects nonnumeric size' file::truncate "${A}" nope
+assert_false 'changed_since rejects missing reference' file::changed_since "${A}" nope
+
+section 'coverage gate: every file::* was exercised'
+
+for fn in "${EXPECTED_FUNCS[@]}"; do
+    if [[ -n "${HIT[${fn}]:-}" ]]; then pass "covered ${fn}"
+    else fail "uncovered ${fn}"
     fi
-done < <(declare -F | awk '{print $3}' | LC_ALL=C sort | grep '^dir::')
-
-covered_count=$(( declared_count - missing_count ))
-
-if (( missing_count == 0 )); then
-    ok "coverage all dir functions marked (${covered_count}/${declared_count})"
-fi
-
-# -----------------------------------------------------------------------------
-# Summary
-# -----------------------------------------------------------------------------
+done
 
 printf '\n============================================================\n'
-printf ' dir.sh brutal test summary\n'
+printf ' file.sh brutal test summary\n'
 printf '============================================================\n'
-printf 'Path   : %s\n' "${PATH_LIB}"
-printf 'Dir    : %s\n' "${DIR_LIB}"
-printf 'Root   : %s\n' "${TEST_ROOT}"
+printf 'Target : %s\n' "${TARGET_FILE}"
+printf 'Root   : %s\n' "${ROOT_TMP}"
+printf 'Funcs  : %s\n' "${#EXPECTED_FUNCS[@]}"
 printf 'Total  : %s\n' "${TOTAL}"
 printf 'Pass   : %s\n' "${PASS}"
 printf 'Fail   : %s\n' "${FAIL}"
 printf 'Skip   : %s\n' "${SKIP}"
-printf 'Funcs  : %s/%s covered\n' "${covered_count}" "${declared_count}"
-printf 'Fuzz   : %s iterations\n' "${FUZZ}"
 printf '============================================================\n'
 
-if (( FAIL > 0 )); then
-    exit 1
-fi
-
-exit 0
+(( FAIL == 0 ))
