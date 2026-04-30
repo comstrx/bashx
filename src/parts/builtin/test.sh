@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/system.sh"
-sys::ensure_bash "$@"
+sys::ensure_bash 5 "$@"
 
 SYSTEM_FILE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/system.sh"
 ROOT_TMP="$(mktemp -d 2>/dev/null || mktemp -d -t bashx_system_modern)"
@@ -94,11 +94,16 @@ assert_eq 'manual ext-style filter excludes tmp' 'three.txt' "${no_tmp[0]}"
 same_diff="$(diff <(printf '%s\n' a b c) <(printf '%s\n' a b c) 2>/dev/null || true)"
 assert_eq 'process substitution works' '' "$same_diff"
 
-coproc BASHX_COPROC { sed 's/^/ok:/' ; }
-printf '%s\n' ping >&"${BASHX_COPROC[1]}"
-IFS= read -r coproc_line <&"${BASHX_COPROC[0]}"
+coproc BASHX_COPROC { cat; }
+
+printf '%s\n' "ping" >&"${BASHX_COPROC[1]}"
 exec {BASHX_COPROC[1]}>&-
-assert_eq 'coproc works' 'ok:ping' "$coproc_line"
+
+IFS= read -r coproc_out <&"${BASHX_COPROC[0]}" || coproc_out=""
+
+wait "${BASHX_COPROC_PID}" 2>/dev/null || true
+
+assert_eq 'coproc echo works' 'ping' "${coproc_out}"
 
 trap_file="${ROOT_TMP}/trap.txt"
 (
