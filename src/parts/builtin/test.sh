@@ -225,23 +225,41 @@ mark file::abs;         assert_ne 'abs returns absolute path' "$(file::abs "${A}
 mark file::rel;         assert_eq 'rel returns relative from root' 'a.txt' "$(file::rel "${A}" "${ROOT_TMP}" 2>/dev/null || true)"
 mark file::can;         assert_ne 'can returns canonical existing file' "$(file::can "${A}" 2>/dev/null || true)"
 
-section 'metadata'
+section "[metadata]"
 
-meta_file="${root}/metadata.txt"
-file::write "${meta_file}" "alpha beta gamma delta"
+meta_file="$(mktemp "${TMPDIR:-/tmp}/bashx-file-meta.XXXXXX")"
+printf '%s' "alpha beta gamma delta" > "${meta_file}"
+
 meta_size="$(wc -c < "${meta_file}" | tr -d '[:space:]')"
 
 touch_fn file::size
 eq "$(file::size "${meta_file}")" "${meta_size}" "size counts bytes"
 
-mark file::mtime;       assert_ne 'mtime returns timestamp' "$(file::mtime "${A}" 2>/dev/null || true)"
-mark file::atime;       assert_ne 'atime returns timestamp' "$(file::atime "${A}" 2>/dev/null || true)"
-mark file::ctime;       assert_ne 'ctime returns timestamp' "$(file::ctime "${A}" 2>/dev/null || true)"
-mark file::age;         assert_ne 'age returns age seconds' "$(file::age "${A}" 2>/dev/null || true)"
-mark file::owner;       file::owner "${A}" >/dev/null 2>&1 && pass 'owner returns owner' || skip 'owner unavailable'
-mark file::group;       file::group "${A}" >/dev/null 2>&1 && pass 'group returns group' || skip 'group unavailable'
-mark file::mode;        assert_ne 'mode returns permissions' "$(file::mode "${A}" 2>/dev/null || true)"
-mark file::inode;       assert_ne 'inode returns inode' "$(file::inode "${A}" 2>/dev/null || true)"
+touch_fn file::mtime
+ok "file::mtime \"${meta_file}\" >/dev/null" "mtime returns timestamp"
+
+touch_fn file::atime
+ok "file::atime \"${meta_file}\" >/dev/null" "atime returns timestamp"
+
+touch_fn file::ctime
+ok "file::ctime \"${meta_file}\" >/dev/null" "ctime returns timestamp"
+
+touch_fn file::age
+ok "file::age \"${meta_file}\" >/dev/null" "age returns age seconds"
+
+touch_fn file::owner
+ok "file::owner \"${meta_file}\" >/dev/null" "owner returns owner"
+
+touch_fn file::group
+ok "file::group \"${meta_file}\" >/dev/null" "group returns group"
+
+touch_fn file::mode
+ok "file::mode \"${meta_file}\" >/dev/null" "mode returns permissions"
+
+touch_fn file::inode
+ok "file::inode \"${meta_file}\" >/dev/null" "inode returns inode"
+
+rm -f -- "${meta_file}" 2>/dev/null || true
 
 section 'filesystem mutations'
 
