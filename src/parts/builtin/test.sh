@@ -190,7 +190,16 @@ mark file::filled;      assert_true  'filled detects content' file::filled "${A}
 mark file::filled;      assert_false 'filled rejects empty file' file::filled "${EMPTY}"
 mark file::readable;    assert_true  'readable detects readable file' file::readable "${A}"
 mark file::writable;    assert_true  'writable detects writable file' file::writable "${A}"
-mark file::executable;  chmod +x "${A}" 2>/dev/null || true; assert_true 'executable detects executable file' file::executable "${A}"; chmod -x "${A}" 2>/dev/null || true
+mark file::executable
+chmod +x "${A}" 2>/dev/null || true
+
+if [[ -x "${A}" ]]; then
+    assert_true 'executable detects executable file' file::executable "${A}"
+else
+    skip 'executable bit unsupported on this filesystem'
+fi
+
+chmod -x "${A}" 2>/dev/null || true
 mark file::is_hidden;   printf x > "${ROOT_TMP}/.hidden"; assert_true 'is_hidden detects dotfile' file::is_hidden "${ROOT_TMP}/.hidden"
 mark file::is_hidden;   assert_false 'is_hidden rejects normal file' file::is_hidden "${A}"
 mark file::is_under;    assert_true  'is_under detects file below root' file::is_under "${A}" "${ROOT_TMP}"
@@ -199,12 +208,23 @@ mark file::is_same;     assert_true  'is_same detects same file path' file::is_s
 mark file::has_ext;     assert_true  'has_ext matches extension' file::has_ext "${A}" txt TXT
 mark file::has_ext;     assert_false 'has_ext rejects wrong extension' file::has_ext "${A}" md
 
-if ln -s "${A}" "${ROOT_TMP}/a.link" 2>/dev/null; then
-    mark file::is_link;     assert_true  'is_link detects symlink to file' file::is_link "${ROOT_TMP}/a.link"
-    mark file::readlink;    assert_ne    'readlink returns target' "$(file::readlink "${ROOT_TMP}/a.link" 2>/dev/null || true)"
+if ln -s "${A}" "${ROOT_TMP}/a.link" 2>/dev/null && [[ -L "${ROOT_TMP}/a.link" ]]; then
+    mark file::is_link
+    assert_true 'is_link detects symlink to file' file::is_link "${ROOT_TMP}/a.link"
+
+    mark file::readlink
+    if file::readlink "${ROOT_TMP}/a.link" >/dev/null 2>&1; then
+        assert_ne 'readlink returns target' "$(file::readlink "${ROOT_TMP}/a.link" 2>/dev/null || true)"
+    else
+        skip 'readlink unavailable for symlink on this platform'
+    fi
 else
-    mark file::is_link;     skip 'is_link symlink unsupported'
-    mark file::readlink;    skip 'readlink symlink unsupported'
+    rm -f -- "${ROOT_TMP}/a.link" 2>/dev/null || true
+    mark file::is_link
+    skip 'is_link symlink unsupported on this platform'
+
+    mark file::readlink
+    skip 'readlink symlink unsupported on this platform'
 fi
 
 section 'names, transforms, resolution'
