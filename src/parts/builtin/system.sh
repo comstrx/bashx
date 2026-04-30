@@ -76,14 +76,14 @@ sys::is_unix () {
 sys::is_cygwin () {
 
     local s=""
-
     [[ "${OSTYPE:-}" == cygwin* ]] && return 0
 
     if sys::has uname; then
         s="$(uname -s 2>/dev/null || true)"
+        [[ "${s}" == CYGWIN* ]] && return 0
     fi
 
-    [[ "${s}" == CYGWIN* ]]
+    return 1
 
 }
 sys::is_msys () {
@@ -384,8 +384,8 @@ sys::which () {
 }
 sys::which_all () {
 
-    local bin="${1:-}" path_value="${PATH:-}" sep="" dir="" entry="" ext=""
-    local -a dirs=()
+    local bin="${1:-}" path_value="${PATH:-}" sep="" dir="" entry="" ext="" found=1
+    local -a dirs=() exts=()
 
     [[ -n "${bin}" ]] || return 1
     [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
@@ -397,21 +397,27 @@ sys::which_all () {
 
     IFS="${sep}" read -r -a dirs <<< "${path_value}"
 
+    if sys::is_windows; then exts=( "" ".exe" ".cmd" ".bat" ".ps1" )
+    else exts=( "" )
+    fi
+
     for dir in "${dirs[@]}"; do
 
         [[ -n "${dir}" ]] || continue
 
-        entry="${dir%/}/${bin}"
-        [[ -f "${entry}" && -x "${entry}" ]] && printf '%s\n' "${entry}"
+        for ext in "${exts[@]}"; do
 
-        if sys::is_windows; then
-            for ext in ".exe" ".cmd" ".bat" ".ps1"; do
-                entry="${dir%/}/${bin}${ext}"
-                [[ -f "${entry}" && -x "${entry}" ]] && printf '%s\n' "${entry}"
-            done
-        fi
+            entry="${dir%/}/${bin}${ext}"
+            [[ -f "${entry}" && -x "${entry}" ]] || continue
+
+            printf '%s\n' "${entry}"
+            found=0
+
+        done
 
     done
+
+    return "${found}"
 
 }
 sys::path_sep () {
@@ -902,34 +908,77 @@ sys::open () {
 
 }
 
+sys::df_field () {
+
+    local path="${1:-.}" field="${2:-}" win="" norm="" distro="" linux_path="" v=""
+
+    [[ -n "${path}" ]] || path="."
+    [[ -e "${path}" ]] || return 1
+    [[ "${field}" =~ ^[0-9]+$ ]] || return 1
+
+    sys::is_windows || return 1
+
+    sys::has wsl.exe || return 1
+    sys::has cygpath && win="$(cygpath -aw "${path}" 2>/dev/null || true)"
+
+    [[ -n "${win}" ]] || win="$(pwd -W 2>/dev/null || true)"
+    [[ -n "${win}" ]] || return 1
+
+    norm="${win//\\//}"
+
+    if [[ "${norm}" =~ ^//wsl\$/([^/]+)(/.*)?$ ]]; then
+        distro="${BASH_REMATCH[1]}"
+        linux_path="${BASH_REMATCH[2]:-/}"
+    elif [[ "${norm}" =~ ^//wsl[.]localhost/([^/]+)(/.*)?$ ]]; then
+        distro="${BASH_REMATCH[1]}"
+        linux_path="${BASH_REMATCH[2]:-/}"
+    elif [[ "${norm}" =~ ^//[?]/UNC/wsl\$/([^/]+)(/.*)?$ ]]; then
+        distro="${BASH_REMATCH[1]}"
+        linux_path="${BASH_REMATCH[2]:-/}"
+    elif [[ "${norm}" =~ ^//[?]/UNC/wsl[.]localhost/([^/]+)(/.*)?$ ]]; then
+        distro="${BASH_REMATCH[1]}"
+        linux_path="${BASH_REMATCH[2]:-/}"
+    else
+        return 1
+    fi
+
+    [[ -n "${distro}" && -n "${linux_path}" ]] || return 1
+
+    v="$(MSYS2_ARG_CONV_EXCL="*" wsl.exe -d "${distro}" -- df -Pk "${linux_path}" 2>/dev/null |
+        tr -d '\r' | awk -v f="${field}" 'NR > 1 && $f ~ /^[0-9]+$/ { print $f; exit }')"
+
+    [[ "${v}" =~ ^[0-9]+$ ]] || return 1
+    printf '%s\n' "$(( v * 1024 ))"
+
+}
 sys::disk_total () {
 
     local path="${1:-.}" v=""
 
-    [[ -n "${path}" ]] || path='.'
+    [[ -n "${path}" ]] || path="."
     [[ -e "${path}" ]] || return 1
 
     if sys::has df; then
-        v="$(df -Pk "${path}" 2>/dev/null | awk 'NR==2 {print $2}' | head -n 1)"
+        v="$(df -Pk "${path}" 2>/dev/null | awk -v f=2 'NR > 1 && $f ~ /^[0-9]+$/ { print $f; exit }')"
         [[ "${v}" =~ ^[0-9]+$ ]] && { printf '%s\n' "$(( v * 1024 ))"; return 0; }
     fi
 
-    return 1
+    sys::df_field "${path}" 2
 
 }
 sys::disk_free () {
 
     local path="${1:-.}" v=""
 
-    [[ -n "${path}" ]] || path='.'
+    [[ -n "${path}" ]] || path="."
     [[ -e "${path}" ]] || return 1
 
     if sys::has df; then
-        v="$(df -Pk "${path}" 2>/dev/null | awk 'NR==2 {print $4}' | head -n 1)"
+        v="$(df -Pk "${path}" 2>/dev/null | awk -v f=4 'NR > 1 && $f ~ /^[0-9]+$/ { print $f; exit }')"
         [[ "${v}" =~ ^[0-9]+$ ]] && { printf '%s\n' "$(( v * 1024 ))"; return 0; }
     fi
 
-    return 1
+    sys::df_field "${path}" 4
 
 }
 sys::disk_used () {
@@ -1116,13 +1165,16 @@ sys::mem_info () {
 
     total="$(sys::mem_total 2>/dev/null || true)"
     free="$(sys::mem_free 2>/dev/null || true)"
-    used="$(sys::mem_used 2>/dev/null || true)"
-    percent="$(sys::mem_percent 2>/dev/null || true)"
 
     [[ "${total}" =~ ^[0-9]+$ ]] || return 1
     [[ "${free}" =~ ^[0-9]+$ ]] || return 1
-    [[ "${used}" =~ ^[0-9]+$ ]] || return 1
-    [[ "${percent}" =~ ^[0-9]+$ ]] || return 1
+
+    (( free <= total )) || free="${total}"
+    used="$(( total - free ))"
+
+    if (( total > 0 )); then percent="$(( used * 100 / total ))"
+    else return 1
+    fi
 
     printf '%s\n' "total=${total}" "free=${free}" "used=${used}" "percent=${percent}"
 
@@ -1365,10 +1417,7 @@ sys::bash_msrv () {
 
     IFS=. read -r n1 n2 n3 <<< "${need}"
 
-    c1="${BASH_REMATCH[1]:-0}"
-    c2="${BASH_REMATCH[3]:-0}"
-    c3="${BASH_REMATCH[5]:-0}"
-
+    c1="${BASH_REMATCH[1]:-0}"; c2="${BASH_REMATCH[3]:-0}"; c3="${BASH_REMATCH[5]:-0}"
     n1="${n1:-0}"; n2="${n2:-0}"; n3="${n3:-0}"
     c1="${c1:-0}"; c2="${c2:-0}"; c3="${c3:-0}"
 
@@ -1521,6 +1570,7 @@ sys::ensure_bash () {
     [[ -n "${found}" ]] || exit 1
 
     script="${0:-}"
+
     [[ -z "${script}" || ! -f "${script}" ]] && script="${BASH_SOURCE[0]:-${0:-}}"
     [[ -n "${script}" && -f "${script}" ]] || exit 1
 

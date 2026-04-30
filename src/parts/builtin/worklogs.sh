@@ -4,790 +4,290 @@ codingmaster@codingmstr:/var/www/projects/bashx$
 
 [[CI LINUX]]
 
-4s
-Run "bash" src/parts/builtin/test.sh
-
-[coverage: functions exist]
-  PASS found sys functions
-  PASS declared sys::arch
-  PASS declared sys::can_sudo
-  PASS declared sys::ci_name
-  PASS declared sys::cpu_cores
-  PASS declared sys::cpu_count
-  PASS declared sys::cpu_idle
-  PASS declared sys::cpu_info
-  PASS declared sys::cpu_model
-  PASS declared sys::cpu_threads
-  PASS declared sys::cpu_usage
-  PASS declared sys::disk_free
-  PASS declared sys::disk_info
-  PASS declared sys::disk_percent
-  PASS declared sys::disk_size
-  PASS declared sys::disk_total
-  PASS declared sys::disk_used
-  PASS declared sys::distro
-  PASS declared sys::env_path_name
-  PASS declared sys::exe_suffix
-  PASS declared sys::has
-  PASS declared sys::hostname
-  PASS declared sys::is_admin
-  PASS declared sys::is_ci
-  PASS declared sys::is_ci_pull
-  PASS declared sys::is_ci_push
-  PASS declared sys::is_ci_tag
-  PASS declared sys::is_container
-  PASS declared sys::is_cygwin
-  PASS declared sys::is_gitbash
-  PASS declared sys::is_gui
-  PASS declared sys::is_headless
-  PASS declared sys::is_interactive
-  PASS declared sys::is_linux
-  PASS declared sys::is_macos
-  PASS declared sys::is_msys
-  PASS declared sys::is_posix
-  PASS declared sys::is_root
-  PASS declared sys::is_terminal
-  PASS declared sys::is_unix
-  PASS declared sys::is_windows
-  PASS declared sys::is_wsl
-  PASS declared sys::kernel
-  PASS declared sys::lib_suffix
-  PASS declared sys::line_sep
-  PASS declared sys::loadavg
-  PASS declared sys::manager
-  PASS declared sys::mem_free
-  PASS declared sys::mem_info
-  PASS declared sys::mem_percent
-  PASS declared sys::mem_total
-  PASS declared sys::mem_used
-  PASS declared sys::name
-  PASS declared sys::null
-  PASS declared sys::open
-  PASS declared sys::path_dirs
-  PASS declared sys::path_sep
-  PASS declared sys::runtime
-  PASS declared sys::uptime
-  PASS declared sys::username
-  PASS declared sys::version
-
-and platform predicates]
-  PASS has detects sh/bash command
-  PASS has rejects missing command
-  PASS is_linux matches environment
-  PASS is_macos rejects non-macos
-  PASS is_cygwin rejects non-cygwin
-  PASS is_msys rejects non-msys
-  PASS is_wsl rejects non-wsl
-  PASS is_windows rejects unix runtime
-  PASS is_gitbash callable and false when not detected
-  PASS is_unix matches linux/macos
-  PASS is_posix matches supported shell runtimes
-
-[CI detection and event simulation]
-  PASS ci_name detects github
-  PASS ci_name detects gitlab
-  PASS ci_name detects generic CI
-  PASS ci_name none returns non-zero
-  PASS is_ci true in simulated github
-  PASS is_ci false without CI vars
-  PASS is_ci_pull detects github pull_request
-  PASS is_ci_pull detects gitlab merge request
-  PASS is_ci_pull rejects normal push
-  PASS is_ci_push detects github push
-  PASS is_ci_push rejects pull request
-  PASS is_ci_tag detects github tag
-  PASS is_ci_tag detects gitlab tag
-  PASS is_ci_tag rejects branch
-
-[runtime modes and privilege predicates]
-  PASS is_terminal callable false
-  PASS is_interactive callable false
-  PASS is_gui callable false
-  PASS is_headless inverse of gui
-  PASS is_container callable false
-  PASS is_root callable false
-  PASS is_admin callable false
-  PASS can_sudo callable true
-
-[system constants and PATH parsing]
-  PASS null returns unix null device
-  PASS path_sep returns native unix separator
-  PASS line_sep returns lf code
-  PASS env_path_name returns PATH on unix
-  PASS exe_suffix empty on unix
-  PASS lib_suffix unix so
-  PASS path_dirs splits colon PATH
-  PASS path_dirs splits semicolon PATH
-  PASS path_dirs returns current path entries
-
-[identity, OS metadata, package manager and architecture]
-  PASS name is known family
-  PASS name agrees with linux
-  PASS runtime is known layer
-  PASS kernel returns value
-  PASS distro returns value
-  PASS manager returns known token or unknown
-  PASS manager known returns zero
-  PASS arch returns value
-  PASS version returns value
-  PASS hostname returns value
-  PASS username returns value
-  PASS username strips domain prefix
-
-[uptime and load averages]
-  PASS uptime returns seconds
-  PASS loadavg returns three fields
-
-[safe opener behavior]
-  PASS open rejects empty target
-  PASS open rejects target with newline
-  PASS open app launches harmless true command
-
-[disk information accuracy and invariants]
-  PASS disk_total numeric
-  PASS disk_free numeric
-  PASS disk_used numeric
-  PASS disk free <= total
-  PASS disk used <= total
-  PASS disk_percent 0..100
-  PASS disk_size numeric
-  PASS disk_size at least file bytes
-  PASS disk_info has total
-  PASS disk_info has free
-  PASS disk_info has used
-  PASS disk_info has percent
-
-[memory information accuracy and invariants]
-  PASS mem_total numeric
-  PASS mem_free numeric
-  PASS mem_used numeric
-  PASS mem_total positive
-  PASS mem_used <= mem_total
-  PASS mem_percent 0..100
-  PASS mem_info has total
-  PASS mem_info has free
-  PASS mem_info has used
-  PASS mem_info has percent
-
-[CPU information accuracy and invariants]
-  PASS cpu_threads numeric
-  PASS cpu_threads >= 1
-  PASS cpu_count aliases cpu_threads
-  PASS cpu_cores numeric
-  PASS cpu_cores >= 1
-  PASS cpu_cores <= cpu_threads
-  PASS cpu_model returns value
-  PASS cpu_usage 0..100
-  PASS cpu_idle 0..100
-  PASS cpu_info has model
-  PASS cpu_info has cores
-  PASS cpu_info has threads
-  PASS cpu_info has usage
-  PASS cpu_info has idle
-
-[negative and adversarial inputs]
-  PASS disk_total rejects missing path
-  PASS disk_free rejects missing path
-  PASS disk_size rejects empty path
-  PASS disk_size rejects missing path
-
-[coverage gate: every sys::* was exercised]
-  PASS covered sys::arch
-  PASS covered sys::can_sudo
-  PASS covered sys::ci_name
-  PASS covered sys::cpu_cores
-  PASS covered sys::cpu_count
-  PASS covered sys::cpu_idle
-  PASS covered sys::cpu_info
-  PASS covered sys::cpu_model
-  PASS covered sys::cpu_threads
-  PASS covered sys::cpu_usage
-  PASS covered sys::disk_free
-  PASS covered sys::disk_info
-  PASS covered sys::disk_percent
-  PASS covered sys::disk_size
-  PASS covered sys::disk_total
-  PASS covered sys::disk_used
-  PASS covered sys::distro
-  PASS covered sys::env_path_name
-  PASS covered sys::exe_suffix
-  PASS covered sys::has
-  PASS covered sys::hostname
-  PASS covered sys::is_admin
-  PASS covered sys::is_ci
-  PASS covered sys::is_ci_pull
-  PASS covered sys::is_ci_push
-  PASS covered sys::is_ci_tag
-  PASS covered sys::is_container
-  PASS covered sys::is_cygwin
-  PASS covered sys::is_gitbash
-  PASS covered sys::is_gui
-  PASS covered sys::is_headless
-  PASS covered sys::is_interactive
-  PASS covered sys::is_linux
-  PASS covered sys::is_macos
-  PASS covered sys::is_msys
-  PASS covered sys::is_posix
-  PASS covered sys::is_root
-  PASS covered sys::is_terminal
-  PASS covered sys::is_unix
-  PASS covered sys::is_windows
-  PASS covered sys::is_wsl
-  PASS covered sys::kernel
-  PASS covered sys::lib_suffix
-  PASS covered sys::line_sep
-  PASS covered sys::loadavg
-  PASS covered sys::manager
-  PASS covered sys::mem_free
-  PASS covered sys::mem_info
-  PASS covered sys::mem_percent
-  PASS covered sys::mem_total
-  PASS covered sys::mem_used
-  PASS covered sys::name
-  PASS covered sys::null
-  PASS covered sys::open
-  PASS covered sys::path_dirs
-  PASS covered sys::path_sep
-  PASS covered sys::runtime
-  PASS covered sys::uptime
-  PASS covered sys::username
-  PASS covered sys::version
-
-============================================================
- system.sh brutal test summary
-============================================================
-Target : src/parts/builtin/system.sh
-Root   : /tmp/tmp.qBj25oIquN
-Funcs  : 60
-Total  : 220
-Pass   : 220
-Fail   : 0
-Skip   : 0
-============================================================
-
 [[CI MACOS]]
-
-1s
-Run "/opt/homebrew/bin/bash" src/parts/builtin/test.sh
-
-[coverage: functions exist]
-  PASS found sys functions
-  PASS declared sys::arch
-  PASS declared sys::can_sudo
-  PASS declared sys::ci_name
-  PASS declared sys::cpu_cores
-  PASS declared sys::cpu_count
-  PASS declared sys::cpu_idle
-  PASS declared sys::cpu_info
-  PASS declared sys::cpu_model
-  PASS declared sys::cpu_threads
-  PASS declared sys::cpu_usage
-  PASS declared sys::disk_free
-  PASS declared sys::disk_info
-  PASS declared sys::disk_percent
-  PASS declared sys::disk_size
-  PASS declared sys::disk_total
-  PASS declared sys::disk_used
-  PASS declared sys::distro
-  PASS declared sys::env_path_name
-  PASS declared sys::exe_suffix
-  PASS declared sys::has
-  PASS declared sys::hostname
-  PASS declared sys::is_admin
-  PASS declared sys::is_ci
-  PASS declared sys::is_ci_pull
-  PASS declared sys::is_ci_push
-  PASS declared sys::is_ci_tag
-  PASS declared sys::is_container
-  PASS declared sys::is_cygwin
-  PASS declared sys::is_gitbash
-  PASS declared sys::is_gui
-  PASS declared sys::is_headless
-  PASS declared sys::is_interactive
-  PASS declared sys::is_linux
-  PASS declared sys::is_macos
-  PASS declared sys::is_msys
-  PASS declared sys::is_posix
-  PASS declared sys::is_root
-  PASS declared sys::is_terminal
-  PASS declared sys::is_unix
-  PASS declared sys::is_windows
-  PASS declared sys::is_wsl
-  PASS declared sys::kernel
-  PASS declared sys::lib_suffix
-  PASS declared sys::line_sep
-  PASS declared sys::loadavg
-  PASS declared sys::manager
-  PASS declared sys::mem_free
-  PASS declared sys::mem_info
-  PASS declared sys::mem_percent
-  PASS declared sys::mem_total
-  PASS declared sys::mem_used
-  PASS declared sys::name
-  PASS declared sys::null
-  PASS declared sys::open
-  PASS declared sys::path_dirs
-  PASS declared sys::path_sep
-  PASS declared sys::runtime
-  PASS declared sys::uptime
-  PASS declared sys::username
-  PASS declared sys::version
-
-and platform predicates]
-  PASS has detects sh/bash command
-  PASS has rejects missing command
-  PASS is_linux rejects non-linux
-  PASS is_macos matches environment
-  PASS is_cygwin rejects non-cygwin
-  PASS is_msys rejects non-msys
-  PASS is_wsl rejects non-wsl
-  PASS is_windows rejects unix runtime
-  PASS is_gitbash callable and false when not detected
-  PASS is_unix matches linux/macos
-  PASS is_posix matches supported shell runtimes
-
-[CI detection and event simulation]
-  PASS ci_name detects github
-  PASS ci_name detects gitlab
-  PASS ci_name detects generic CI
-  PASS ci_name none returns non-zero
-  PASS is_ci true in simulated github
-  PASS is_ci false without CI vars
-  PASS is_ci_pull detects github pull_request
-  PASS is_ci_pull detects gitlab merge request
-  PASS is_ci_pull rejects normal push
-  PASS is_ci_push detects github push
-  PASS is_ci_push rejects pull request
-  PASS is_ci_tag detects github tag
-  PASS is_ci_tag detects gitlab tag
-  PASS is_ci_tag rejects branch
-
-[runtime modes and privilege predicates]
-  PASS is_terminal callable false
-  PASS is_interactive callable false
-  PASS is_gui callable false
-  PASS is_headless inverse of gui
-  PASS is_container callable false
-  PASS is_root callable false
-  PASS is_admin callable true
-  PASS can_sudo callable true
-
-[system constants and PATH parsing]
-  PASS null returns unix null device
-  PASS path_sep returns native unix separator
-  PASS line_sep returns lf code
-  PASS env_path_name returns PATH on unix
-  PASS exe_suffix empty on unix
-  PASS lib_suffix macos dylib
-  PASS path_dirs splits colon PATH
-  PASS path_dirs splits semicolon PATH
-  PASS path_dirs returns current path entries
-
-[identity, OS metadata, package manager and architecture]
-  PASS name is known family
-  PASS name agrees with macos
-  PASS runtime is known layer
-  PASS kernel returns value
-  PASS distro returns value
-  PASS manager returns known token or unknown
-  PASS manager known returns zero
-  PASS arch returns value
-  PASS version returns value
-  PASS hostname returns value
-  PASS username returns value
-  PASS username strips domain prefix
-
-[uptime and load averages]
-  PASS uptime returns seconds
-  PASS loadavg returns three fields
-
-[safe opener behavior]
-  PASS open rejects empty target
-  PASS open rejects target with newline
-  PASS open app launches harmless true command
-
-[disk information accuracy and invariants]
-  PASS disk_total numeric
-  PASS disk_free numeric
-  PASS disk_used numeric
-  PASS disk free <= total
-  PASS disk used <= total
-  PASS disk_percent 0..100
-  PASS disk_size numeric
-  PASS disk_size at least file bytes
-  PASS disk_info has total
-  PASS disk_info has free
-  PASS disk_info has used
-  PASS disk_info has percent
-
-[memory information accuracy and invariants]
-  PASS mem_total numeric
-  PASS mem_free numeric
-  PASS mem_used numeric
-  PASS mem_total positive
-  PASS mem_used <= mem_total
-  PASS mem_percent 0..100
-  PASS mem_info has total
-  PASS mem_info has free
-  PASS mem_info has used
-  PASS mem_info has percent
-
-[CPU information accuracy and invariants]
-  PASS cpu_threads numeric
-  PASS cpu_threads >= 1
-  PASS cpu_count aliases cpu_threads
-  PASS cpu_cores numeric
-  PASS cpu_cores >= 1
-  PASS cpu_cores <= cpu_threads
-  PASS cpu_model returns value
-  PASS cpu_usage 0..100
-  PASS cpu_idle 0..100
-  PASS cpu_info has model
-  PASS cpu_info has cores
-  PASS cpu_info has threads
-  PASS cpu_info has usage
-  PASS cpu_info has idle
-
-[negative and adversarial inputs]
-  PASS disk_total rejects missing path
-  PASS disk_free rejects missing path
-  PASS disk_size rejects empty path
-  PASS disk_size rejects missing path
-
-[coverage gate: every sys::* was exercised]
-  PASS covered sys::arch
-  PASS covered sys::can_sudo
-  PASS covered sys::ci_name
-  PASS covered sys::cpu_cores
-  PASS covered sys::cpu_count
-  PASS covered sys::cpu_idle
-  PASS covered sys::cpu_info
-  PASS covered sys::cpu_model
-  PASS covered sys::cpu_threads
-  PASS covered sys::cpu_usage
-  PASS covered sys::disk_free
-  PASS covered sys::disk_info
-  PASS covered sys::disk_percent
-  PASS covered sys::disk_size
-  PASS covered sys::disk_total
-  PASS covered sys::disk_used
-  PASS covered sys::distro
-  PASS covered sys::env_path_name
-  PASS covered sys::exe_suffix
-  PASS covered sys::has
-  PASS covered sys::hostname
-  PASS covered sys::is_admin
-  PASS covered sys::is_ci
-  PASS covered sys::is_ci_pull
-  PASS covered sys::is_ci_push
-  PASS covered sys::is_ci_tag
-  PASS covered sys::is_container
-  PASS covered sys::is_cygwin
-  PASS covered sys::is_gitbash
-  PASS covered sys::is_gui
-  PASS covered sys::is_headless
-  PASS covered sys::is_interactive
-  PASS covered sys::is_linux
-  PASS covered sys::is_macos
-  PASS covered sys::is_msys
-  PASS covered sys::is_posix
-  PASS covered sys::is_root
-  PASS covered sys::is_terminal
-  PASS covered sys::is_unix
-  PASS covered sys::is_windows
-  PASS covered sys::is_wsl
-  PASS covered sys::kernel
-  PASS covered sys::lib_suffix
-  PASS covered sys::line_sep
-  PASS covered sys::loadavg
-  PASS covered sys::manager
-  PASS covered sys::mem_free
-  PASS covered sys::mem_info
-  PASS covered sys::mem_percent
-  PASS covered sys::mem_total
-  PASS covered sys::mem_used
-  PASS covered sys::name
-  PASS covered sys::null
-  PASS covered sys::open
-  PASS covered sys::path_dirs
-  PASS covered sys::path_sep
-  PASS covered sys::runtime
-  PASS covered sys::uptime
-  PASS covered sys::username
-  PASS covered sys::version
-
-============================================================
- system.sh brutal test summary
-============================================================
-Target : src/parts/builtin/system.sh
-Root   : /var/folders/tb/y368xp_x10s3ty1b_mtl5mxr0000gn/T/tmp.oOnvpEDJKM
-Funcs  : 60
-Total  : 220
-Pass   : 220
-Fail   : 0
-Skip   : 0
-============================================================
 
 [[CI WINDOWS]]
 
-27s
-Run "bash" src/parts/builtin/test.sh
+[[WSL]]
 
-[coverage: functions exist]
-  PASS found sys functions
-  PASS declared sys::arch
-  PASS declared sys::can_sudo
-  PASS declared sys::ci_name
-  PASS declared sys::cpu_cores
-  PASS declared sys::cpu_count
-  PASS declared sys::cpu_idle
-  PASS declared sys::cpu_info
-  PASS declared sys::cpu_model
-  PASS declared sys::cpu_threads
-  PASS declared sys::cpu_usage
-  PASS declared sys::disk_free
-  PASS declared sys::disk_info
-  PASS declared sys::disk_percent
-  PASS declared sys::disk_size
-  PASS declared sys::disk_total
-  PASS declared sys::disk_used
-  PASS declared sys::distro
-  PASS declared sys::env_path_name
-  PASS declared sys::exe_suffix
-  PASS declared sys::has
-  PASS declared sys::hostname
-  PASS declared sys::is_admin
-  PASS declared sys::is_ci
-  PASS declared sys::is_ci_pull
-  PASS declared sys::is_ci_push
-  PASS declared sys::is_ci_tag
-  PASS declared sys::is_container
-  PASS declared sys::is_cygwin
-  PASS declared sys::is_gitbash
-  PASS declared sys::is_gui
-  PASS declared sys::is_headless
-  PASS declared sys::is_interactive
-  PASS declared sys::is_linux
-  PASS declared sys::is_macos
-  PASS declared sys::is_msys
-  PASS declared sys::is_posix
-  PASS declared sys::is_root
-  PASS declared sys::is_terminal
-  PASS declared sys::is_unix
-  PASS declared sys::is_windows
-  PASS declared sys::is_wsl
-  PASS declared sys::kernel
-  PASS declared sys::lib_suffix
-  PASS declared sys::line_sep
-  PASS declared sys::loadavg
-  PASS declared sys::manager
-  PASS declared sys::mem_free
-  PASS declared sys::mem_info
-  PASS declared sys::mem_percent
-  PASS declared sys::mem_total
-  PASS declared sys::mem_used
-  PASS declared sys::name
-  PASS declared sys::null
-  PASS declared sys::open
-  PASS declared sys::path_dirs
-  PASS declared sys::path_sep
-  PASS declared sys::runtime
-  PASS declared sys::uptime
-  PASS declared sys::username
-  PASS declared sys::version
+codingmaster@codingmstr:/var/www/projects/bashx$ bash src/parts/builtin/test.sh
 
-and platform predicates]
-  PASS has detects sh/bash command
-  PASS has rejects missing command
-  PASS is_linux rejects non-linux
-  PASS is_macos rejects non-macos
-  PASS is_cygwin rejects non-cygwin
-  PASS is_msys matches environment
-  PASS is_wsl rejects non-wsl
-  PASS is_windows matches runtime
-  PASS is_gitbash callable and true when detected
-  PASS is_unix rejects non linux/macos
-  PASS is_posix matches supported shell runtimes
+[commands]
+sys::shell               = /usr/bin/bash
+sys::has bash            =
+sys::which bash          = /usr/bin/bash
+sys::which_all bash      = /usr/bin/bash | /bin/bash
 
-[CI detection and event simulation]
-  PASS ci_name detects github
-  PASS ci_name detects gitlab
-  PASS ci_name detects generic CI
-  PASS ci_name none returns non-zero
-  PASS is_ci true in simulated github
-  PASS is_ci false without CI vars
-  PASS is_ci_pull detects github pull_request
-  PASS is_ci_pull detects gitlab merge request
-  PASS is_ci_pull rejects normal push
-  PASS is_ci_push detects github push
-  PASS is_ci_push rejects pull request
-  PASS is_ci_tag detects github tag
-  PASS is_ci_tag detects gitlab tag
-  PASS is_ci_tag rejects branch
+[platform]
+sys::name                = linux
+sys::runtime             = wsl
+sys::kernel              = Linux
+sys::distro              = ubuntu
+sys::manager             = apt
+sys::arch                = x64
+sys::version             = 5.15.167.4-microsoft-standard-WSL2
 
-[runtime modes and privilege predicates]
-  PASS is_terminal callable false
-  PASS is_interactive callable false
-  PASS is_gui callable false
-  PASS is_headless inverse of gui
-  PASS is_container callable false
-  PASS is_root callable true
-  PASS is_admin true when root/admin
-  PASS can_sudo callable false
+[env/constants]
+sys::path_sep            = :
+sys::line_sep            = lf
+sys::path_name           = PATH
+sys::exe_suffix          =
+sys::lib_suffix          = .so
+sys::path_dirs           = /home/codingmaster/.local/bin | /home/codingmaster/.local/zig/current | /home/codingmaster/.sdkman/candidates/maven/current/bin | /home/codingmaster/.sdkman/candidates/gradle/current/bin | /home/codingmaster/.bun/bin | /home/codingmaster/.pixi/bin | /home/codingmaster/.local/bin | /home/codingmaster/.nvm/versions/node/v25.2.1/bin | /mnt/c/Users/codingmstr/AppData/Local/Programs/Microsoft VS Code/bin | /usr/local/go/bin | /home/codingmaster/.cargo/bin | /run/user/1000/fnm_multishells/1013_1777540944871/bin | /home/codingmaster/.local/share/fnm | /home/codingmaster/.grit/bin | /usr/local/sbin | /usr/local/bin | /usr/sbin | /usr/bin | /sbin | /bin | /usr/games | /usr/local/games | /usr/lib/wsl/lib | /snap/bin | /home/codingmaster/.dotnet/tools | /home/codingmaster/.local/bin | /opt/zig | /home/codingmaster/.local/bin
 
-[system constants and PATH parsing]
-  PASS null returns windows null device
-  PASS path_sep returns native windows separator
-  PASS line_sep returns crlf code
-  PASS env_path_name returns Path on windows
-  PASS exe_suffix returns .exe on windows
-  PASS lib_suffix windows dll
-  PASS path_dirs splits colon PATH
-  PASS path_dirs splits semicolon PATH
-  PASS path_dirs returns current path entries
+[identity]
+sys::hostname            = codingmstr
+sys::username            = codingmaster
 
-[identity, OS metadata, package manager and architecture]
-  PASS name is known family
-  PASS name agrees with windows
-  PASS runtime is known layer
-  PASS runtime agrees with gitbash
-  PASS kernel returns value
-  PASS distro returns value
-  PASS manager returns known token or unknown
-  PASS manager known returns zero
-  PASS arch returns value
-  PASS version returns value
-  PASS hostname returns value
-  PASS username returns value
-  PASS username strips domain prefix
+[ci/runtime flags]
+sys::ci_name             = <failed:1>
+sys::is_ci               = <failed:1>
+sys::is_ci_pull          = <failed:1>
+sys::is_ci_push          = <failed:1>
+sys::is_ci_tag           = <failed:1>
+sys::is_linux            =
+sys::is_macos            = <failed:1>
+sys::is_windows          = <failed:1>
+sys::is_wsl              =
+sys::is_msys             = <failed:1>
+sys::is_gitbash          = <failed:1>
+sys::is_cygwin           = <failed:1>
+sys::is_unix             =
+sys::is_posix            =
+sys::is_gui              =
+sys::is_headless         = <failed:1>
+sys::is_terminal         =
+sys::is_interactive      = <failed:1>
+sys::is_container        =
+sys::is_root             = <failed:1>
+sys::is_admin            =
+sys::can_sudo            = <failed:1>
 
-[uptime and load averages]
-  PASS uptime returns seconds
-  PASS loadavg returns three fields
+[time/load]
+sys::uptime              = 23360
+sys::loadavg             = 0.12 0.14 0.06
 
-[safe opener behavior]
-  PASS open rejects empty target
-  PASS open rejects target with newline
-  PASS open app launches harmless true command
+[disk]
+sys::disk_total .        = 1081101176832
+sys::disk_free .         = 974579568640
+sys::disk_used .         = 106521608192
+sys::disk_percent .      = 9
+sys::disk_size .         = 3080192
+sys::disk_info .         = path=. | total=1081101176832 | free=974579568640 | used=106521608192 | percent=9
 
-[disk information accuracy and invariants]
-  PASS disk_total numeric
-  PASS disk_free numeric
-  PASS disk_used numeric
-  PASS disk free <= total
-  PASS disk used <= total
-  PASS disk_percent 0..100
-  PASS disk_size numeric
-  PASS disk_size at least file bytes
-  PASS disk_info has total
-  PASS disk_info has free
-  PASS disk_info has used
-  PASS disk_info has percent
+[memory]
+sys::mem_total           = 6218076160
+sys::mem_free            = 4978118656
+sys::mem_used            = 1239957504
+sys::mem_percent         = 19
+sys::mem_info            = total=6218076160 | free=4977434624 | used=1240641536 | percent=19
 
-[memory information accuracy and invariants]
-  PASS mem_total numeric
-  PASS mem_free numeric
-  PASS mem_used numeric
-  PASS mem_total positive
-  PASS mem_used <= mem_total
-  PASS mem_percent 0..100
-  PASS mem_info has total
-  PASS mem_info has free
-  PASS mem_info has used
-  PASS mem_info has percent
+[cpu]
+sys::cpu_threads         = 8
+sys::cpu_count           = 8
+sys::cpu_cores           = 4
+sys::cpu_model           = Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+sys::cpu_usage           = 0
+sys::cpu_idle            = 100
+sys::cpu_info            = model=Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz | cores=4 | threads=8 | usage=2 | idle=98
 
-[CPU information accuracy and invariants]
-  PASS cpu_threads numeric
-  PASS cpu_threads >= 1
-  PASS cpu_count aliases cpu_threads
-  PASS cpu_cores numeric
-  PASS cpu_cores >= 1
-  PASS cpu_cores <= cpu_threads
-  PASS cpu_model returns value
-  PASS cpu_usage 0..100
-  PASS cpu_idle 0..100
-  PASS cpu_info has model
-  PASS cpu_info has cores
-  PASS cpu_info has threads
-  PASS cpu_info has usage
-  PASS cpu_info has idle
+[bash]
+sys::bash_version        = 5.2.21(1)-release
+sys::bash_major          = 5
+sys::bash_minor          = 2
+sys::bash_msrv 5         =
+sys::find_bash 5         = /usr/bin/bash
 
-[negative and adversarial inputs]
-  PASS disk_total rejects missing path
-  PASS disk_free rejects missing path
-  PASS disk_size rejects empty path
-  PASS disk_size rejects missing path
+[done]
+codingmaster@codingmstr:/var/www/projects/bashx$
 
-[coverage gate: every sys::* was exercised]
-  PASS covered sys::arch
-  PASS covered sys::can_sudo
-  PASS covered sys::ci_name
-  PASS covered sys::cpu_cores
-  PASS covered sys::cpu_count
-  PASS covered sys::cpu_idle
-  PASS covered sys::cpu_info
-  PASS covered sys::cpu_model
-  PASS covered sys::cpu_threads
-  PASS covered sys::cpu_usage
-  PASS covered sys::disk_free
-  PASS covered sys::disk_info
-  PASS covered sys::disk_percent
-  PASS covered sys::disk_size
-  PASS covered sys::disk_total
-  PASS covered sys::disk_used
-  PASS covered sys::distro
-  PASS covered sys::env_path_name
-  PASS covered sys::exe_suffix
-  PASS covered sys::has
-  PASS covered sys::hostname
-  PASS covered sys::is_admin
-  PASS covered sys::is_ci
-  PASS covered sys::is_ci_pull
-  PASS covered sys::is_ci_push
-  PASS covered sys::is_ci_tag
-  PASS covered sys::is_container
-  PASS covered sys::is_cygwin
-  PASS covered sys::is_gitbash
-  PASS covered sys::is_gui
-  PASS covered sys::is_headless
-  PASS covered sys::is_interactive
-  PASS covered sys::is_linux
-  PASS covered sys::is_macos
-  PASS covered sys::is_msys
-  PASS covered sys::is_posix
-  PASS covered sys::is_root
-  PASS covered sys::is_terminal
-  PASS covered sys::is_unix
-  PASS covered sys::is_windows
-  PASS covered sys::is_wsl
-  PASS covered sys::kernel
-  PASS covered sys::lib_suffix
-  PASS covered sys::line_sep
-  PASS covered sys::loadavg
-  PASS covered sys::manager
-  PASS covered sys::mem_free
-  PASS covered sys::mem_info
-  PASS covered sys::mem_percent
-  PASS covered sys::mem_total
-  PASS covered sys::mem_used
-  PASS covered sys::name
-  PASS covered sys::null
-  PASS covered sys::open
-  PASS covered sys::path_dirs
-  PASS covered sys::path_sep
-  PASS covered sys::runtime
-  PASS covered sys::uptime
-  PASS covered sys::username
-  PASS covered sys::version
+[[MSYS2]]
 
-============================================================
- system.sh brutal test summary
-============================================================
-Target : src/parts/builtin/system.sh
-Root   : /tmp/tmp.OqY0lBNJtO
-Funcs  : 60
-Total  : 221
-Pass   : 221
-Fail   : 0
-Skip   : 0
-============================================================
+
+codingmaster@codingmstr MINGW64 //wsl$/Ubuntu/var/www/projects/bashx
+$ bash src/parts/builtin/test.sh
+
+[commands]
+sys::shell               = /usr/bin/bash
+sys::has bash            =
+sys::which bash          = /usr/bin/bash
+sys::which_all bash      = /usr/bin/bash | /usr/bin/bash.exe | /bin/bash | /bin/bash.exe | /c/Windows/System32/bash | /c/Windows/System32/bash.exe
+
+[platform]
+sys::name                = windows
+sys::runtime             = msys2
+sys::kernel              = MINGW64_NT-10.0-22621
+sys::distro              = msys2
+sys::manager             = pacman
+sys::arch                = x64
+sys::version             = 10.0.22621.0
+
+[env/constants]
+sys::path_sep            = ;
+sys::line_sep            = crlf
+sys::path_name           = Path
+sys::exe_suffix          = .exe
+sys::lib_suffix          = .dll
+sys::path_dirs           = /c/Program Files/dotnet | /c/Users/codingmstr/.bun/bin | /c/Program Files/dotnet | /c/Users/codingmstr/.bun/bin | /mingw64/bin | /usr/local/bin | /usr/bin | /bin | /c/Windows/System32 | /c/Windows | /c/Windows/System32/Wbem | /c/Windows/System32/WindowsPowerShell/v1.0/ | /usr/bin/site_perl | /usr/bin/vendor_perl | /usr/bin/core_perl
+
+[identity]
+sys::hostname            = codingmstr
+sys::username            = codingmaster
+
+[ci/runtime flags]
+sys::ci_name             = <failed:1>
+sys::is_ci               = <failed:1>
+sys::is_ci_pull          = <failed:1>
+sys::is_ci_push          = <failed:1>
+sys::is_ci_tag           = <failed:1>
+sys::is_linux            = <failed:1>
+sys::is_macos            = <failed:1>
+sys::is_windows          =
+sys::is_wsl              = <failed:1>
+sys::is_msys             =
+sys::is_gitbash          = <failed:1>
+sys::is_cygwin           =
+sys::is_unix             = <failed:1>
+sys::is_posix            =
+sys::is_gui              =
+sys::is_headless         = <failed:1>
+sys::is_terminal         =
+sys::is_interactive      = <failed:1>
+sys::is_container        = <failed:1>
+sys::is_root             = <failed:1>
+sys::is_admin            = <failed:1>
+sys::can_sudo            = <failed:1>
+
+[time/load]
+sys::uptime              = 23638
+sys::loadavg             = 1.66 1.73 1.11
+
+[disk]
+sys::disk_total .        = 1081101176832
+sys::disk_free .         = 974579564544
+sys::disk_used .         = 106521612288
+sys::disk_percent .      = 9
+sys::disk_size .         = 2232320
+sys::disk_info .         = path=. | total=1081101176832 | free=974579564544 | used=106521612288 | percent=9
+
+[memory]
+sys::mem_total           = 8417361920
+sys::mem_free            = 956518400
+sys::mem_used            = 7463567360
+sys::mem_percent         = 88
+sys::mem_info            = total=8417361920 | free=983818240 | used=7433543680 | percent=88
+
+[cpu]
+sys::cpu_threads         = 8
+sys::cpu_count           = 8
+sys::cpu_cores           = 4
+sys::cpu_model           = Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+sys::cpu_usage           = 18
+sys::cpu_idle            = 89
+sys::cpu_info            = model=Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz | cores=4 | threads=8 | usage=2 | idle=98
+
+[bash]
+sys::bash_version        = 5.3.9(1)-release
+sys::bash_major          = 5
+sys::bash_minor          = 3
+sys::bash_msrv 5         =
+sys::find_bash 5         = /usr/bin/bash
+
+[done]
+
+codingmaster@codingmstr MINGW64 //wsl$/Ubuntu/var/www/projects/bashx
+
+[[GITBASH]]
+
+codingmaster@codingmstr MINGW64 //wsl$/Ubuntu/var/www/projects/bashx
+$ bash src/parts/builtin/test.sh
+
+[commands]
+sys::shell               = /usr/bin/bash
+sys::has bash            =
+sys::which bash          = /usr/bin/bash
+sys::which_all bash      = /usr/bin/bash | /usr/bin/bash.exe | /bin/bash | /bin/bash.exe | /usr/bin/bash | /usr/bin/bash.exe | /c/Windows/system32/bash | /c/Windows/system32/bash.exe | /bin/bash | /bin/bash.exe | /c/Users/codingmstr/AppData/Local/Microsoft/WindowsApps/bash | /c/Users/codingmstr/AppData/Local/Microsoft/WindowsApps/bash.exe
+
+[platform]
+sys::name                = windows
+sys::runtime             = gitbash
+sys::kernel              = MINGW64_NT-10.0-22621
+sys::distro              = gitbash
+sys::manager             = winget
+sys::arch                = x64
+sys::version             = 10.0.22621.0
+
+[env/constants]
+sys::path_sep            = ;
+sys::line_sep            = crlf
+sys::path_name           = Path
+sys::exe_suffix          = .exe
+sys::lib_suffix          = .dll
+sys::path_dirs           = /c/Users/codingmstr/bin | /mingw64/bin | /usr/local/bin | /usr/bin | /bin | /mingw64/bin | /usr/bin | /c/Users/codingmstr/bin | /c/Program Files/ImageMagick-7.1.1-Q16-HDRI | /c/Windows/system32 | /c/Windows | /c/Windows/System32/Wbem | /c/Windows/System32/WindowsPowerShell/v1.0 | /c/Windows/System32/OpenSSH | /c/Program Files/cmder | /cmd | /bin | /c/ProgramData/ComposerSetup/bin | /c/Program Files/Docker/Docker/resources/bin | /c/Program Files/MySQL/MySQL Server 9.1/bin | /c/Program Files/MATLAB/R2024b/bin | /c/Program Files (x86)/Windows Kits/10/Windows Performance Toolkit | /c/Program Files/redis | /c/Program Files/ffmpeg/bin | /c/Program Files/ngrok | /c/Program Files/WinRAR | /c/Program Files/nodejs | /c/Program Files/GitHub CLI | /c/Program Files/dotnet | /c/Users/codingmstr/.cargo/bin | /c/Users/codingmstr/AppData/Local/Programs/Python/Python312/Scripts | /c/Users/codingmstr/AppData/Local/Programs/Python/Python312 | /c/Users/codingmstr/AppData/Local/Microsoft/WindowsApps | /c/Users/codingmstr/AppData/Roaming/Composer/vendor/bin | /c/Program Files/php-8.3.9 | /c/Program Files/JetBrains/PyCharm 2024.3/bin | /c/Program Files/flutter/bin | /c/Users/codingmstr/AppData/Roaming/npm | /c/Users/codingmstr/AppData/Local/Programs/Microsoft VS Code/bin | /c/Users/codingmstr/AppData/Local/Programs/bin | /c/Users/codingmstr/.bun/bin | /c/Users/codingmstr/.dotnet/tools | /usr/bin/vendor_perl | /usr/bin/core_perl
+
+[identity]
+sys::hostname            = codingmstr
+sys::username            = codingmaster
+
+[ci/runtime flags]
+sys::ci_name             = <failed:1>
+sys::is_ci               = <failed:1>
+sys::is_ci_pull          = <failed:1>
+sys::is_ci_push          = <failed:1>
+sys::is_ci_tag           = <failed:1>
+sys::is_linux            = <failed:1>
+sys::is_macos            = <failed:1>
+sys::is_windows          =
+sys::is_wsl              = <failed:1>
+sys::is_msys             =
+sys::is_gitbash          =
+sys::is_cygwin           = <failed:1>
+sys::is_unix             = <failed:1>
+sys::is_posix            =
+sys::is_gui              =
+sys::is_headless         = <failed:1>
+sys::is_terminal         =
+sys::is_interactive      = <failed:1>
+sys::is_container        = <failed:1>
+sys::is_root             = <failed:1>
+sys::is_admin            = <failed:1>
+sys::can_sudo            = <failed:1>
+
+[time/load]
+sys::uptime              = 23639
+sys::loadavg             = 0.00 0.00 0.00
+
+[disk]
+sys::disk_total .        = 1081101176832
+sys::disk_free .         = 974579564544
+sys::disk_used .         = 106521612288
+sys::disk_percent .      = 9
+sys::disk_size .         = 2232320
+sys::disk_info .         = path=. | total=1081101176832 | free=974579564544 | used=106521612288 | percent=9
+
+[memory]
+sys::mem_total           = 8417361920
+sys::mem_free            = 997179392
+sys::mem_used            = 7434670080
+sys::mem_percent         = 88
+sys::mem_info            = total=8417361920 | free=848424960 | used=7568936960 | percent=89
+
+[cpu]
+sys::cpu_threads         = 8
+sys::cpu_count           = 8
+sys::cpu_cores           = 4
+sys::cpu_model           = Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
+sys::cpu_usage           = 16
+sys::cpu_idle            = 99
+sys::cpu_info            = model=Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz | cores=4 | threads=8 | usage=2 | idle=98
+
+[bash]
+sys::bash_version        = 5.2.26(1)-release
+sys::bash_major          = 5
+sys::bash_minor          = 2
+sys::bash_msrv 5         =
+sys::find_bash 5         = /usr/bin/bash
+
+[done]
+
+codingmaster@codingmstr MINGW64 //wsl$/Ubuntu/var/www/projects/bashx
