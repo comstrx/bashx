@@ -1477,12 +1477,11 @@ sys::ensure_bash () {
 
     fi
 
+    script="${0:-}"
+
     [[ -n "${found}" ]] || exit 1
-
-    script="${BASH_SOURCE[-1]:-${0:-}}"
-
-    [[ -n "${script}" && -f "${script}" ]] || script="${0:-}"
-    [[ -n "${script}" ]] || exit 1
+    [[ -z "${script}" || ! -f "${script}" ]] && script="${BASH_SOURCE[0]:-${0:-}}"
+    [[ -n "${script}" && -f "${script}" ]] || exit 1
 
     ENSURE_MIN_BASH_VERSION_DONE=1 exec "${found}" "${script}" "$@"
 
