@@ -35,19 +35,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install modern bash on macOS
-        if: runner.os == 'macOS'
-        run: |
-          brew install bash
-          /opt/homebrew/bin/bash --version
+      # - name: Install modern bash on macOS
+      #   if: runner.os == 'macOS'
+      #   run: |
+      #     brew install bash
+      #     /opt/homebrew/bin/bash --version
 
-      - name: Make scripts executable
-        if: runner.os != 'Windows'
+      - name: Run test
         run: |
-          chmod +x src/parts/builtin/test.sh || true
-        shell: bash
-
-      - name: Run builtin test
-        run: |
-          "${{ matrix.bash_path }}" src/parts/builtin/test.sh
+          bash src/parts/builtin/test.sh
         shell: bash

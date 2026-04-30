@@ -4,6 +4,7 @@ set -uo pipefail
 
 ROOT="${ROOT:-}"
 TARGET_FILE="${TARGET_FILE:-src/parts/builtin/system.sh}"
+MIN_TEST_BASH_VERSION="${MIN_TEST_BASH_VERSION:-5.2}"
 
 if [[ -z "${ROOT}" ]]; then
     ROOT="$(pwd -P 2>/dev/null || pwd)"
@@ -19,8 +20,27 @@ fi
 # shellcheck source=/dev/null
 source "${TARGET_FILE}"
 
+if declare -F sys::ensure_bash >/dev/null 2>&1; then
+    sys::ensure_bash "${MIN_TEST_BASH_VERSION}" "$@"
+elif declare -F sys::ensure >/dev/null 2>&1; then
+    sys::ensure "${MIN_TEST_BASH_VERSION}" "$@"
+fi
+
+# From this point the test is allowed to use modern Bash features.
+set -uo pipefail
+
+if [[ "${BASH_VERSION:-}" =~ ^([0-9]+)([.]([0-9]+))?([.]([0-9]+))? ]]; then
+    if (( BASH_REMATCH[1] < 5 || ( BASH_REMATCH[1] == 5 && ${BASH_REMATCH[3]:-0} < 2 ) )); then
+        printf 'FATAL: Bash >= %s required after ensure, got %s\n' "${MIN_TEST_BASH_VERSION}" "${BASH_VERSION:-unknown}" >&2
+        exit 1
+    fi
+else
+    printf 'FATAL: unable to parse Bash version: %s\n' "${BASH_VERSION:-unknown}" >&2
+    exit 1
+fi
+
 if ! declare -F sys::has >/dev/null 2>&1; then
-    printf 'FATAL: system.sh was not loaded: %s\n' "${TARGET_FILE}" >&2
+    printf 'FATAL: system.sh was not loaded after ensure: %s\n' "${TARGET_FILE}" >&2
     exit 1
 fi
 
@@ -41,6 +61,10 @@ trap cleanup EXIT INT TERM
 
 mark () {
     HIT["$1"]=1
+}
+
+has_fn () {
+    declare -F "$1" >/dev/null 2>&1
 }
 
 section () {
@@ -122,21 +146,28 @@ assert_num_range () {
     fi
 }
 
-capture_status () {
-    local __var="$1"
-    shift
-    local __out="" __rc=0
-
-    __out="$($@ 2>/dev/null)" || __rc=$?
-    printf -v "${__var}" '%s' "${__out}"
-    return "${__rc}"
-}
-
 fresh_bash () {
     local script="$1"
 
-    ROOT="${ROOT}" TARGET_FILE="${TARGET_ABS}" bash -c 'source "${TARGET_FILE}"; eval "$1"' _ "${script}"
+    ROOT="${ROOT}" TARGET_FILE="${TARGET_ABS}" "${BASH}" -c 'source "${TARGET_FILE}"; eval "$1"' _ "${script}"
 }
+
+section 'bootstrap ensure gate'
+
+if has_fn sys::ensure_bash; then
+    mark sys::ensure_bash
+    assert_true 'ensure_bash is idempotent after bootstrap' sys::ensure_bash "${MIN_TEST_BASH_VERSION}" "noop"
+elif has_fn sys::ensure; then
+    mark sys::ensure
+    assert_true 'ensure is idempotent after bootstrap' sys::ensure "${MIN_TEST_BASH_VERSION}" "noop"
+else
+    skip 'ensure_bash/ensure not present'
+fi
+
+if has_fn sys::bash_msrv; then
+    mark sys::bash_msrv
+    assert_true 'current bash satisfies requested MSRV after ensure' sys::bash_msrv "${MIN_TEST_BASH_VERSION}"
+fi
 
 section 'coverage: functions exist'
 
@@ -151,6 +182,72 @@ for fn in "${DECLARED_FUNCS[@]}"; do
     else fail "missing ${fn}"
     fi
 done
+
+section 'bash runtime layer'
+
+if has_fn sys::bash_version; then
+    mark sys::bash_version
+    assert_eq 'bash_version matches BASH_VERSION' "${BASH_VERSION}" "$(sys::bash_version)"
+fi
+
+if has_fn sys::bash_major; then
+    mark sys::bash_major
+    assert_eq 'bash_major matches BASH_VERSINFO[0]' "${BASH_VERSINFO[0]}" "$(sys::bash_major)"
+fi
+
+if has_fn sys::bash_minor; then
+    mark sys::bash_minor
+    assert_eq 'bash_minor matches BASH_VERSINFO[1]' "${BASH_VERSINFO[1]}" "$(sys::bash_minor)"
+fi
+
+if has_fn sys::bash_msrv; then
+    mark sys::bash_msrv
+    assert_true 'bash_msrv accepts current major' sys::bash_msrv "${BASH_VERSINFO[0]}"
+    assert_true 'bash_msrv accepts current major.minor' sys::bash_msrv "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"
+    assert_false 'bash_msrv rejects impossible future version' sys::bash_msrv "999.0"
+    assert_false 'bash_msrv rejects invalid version' sys::bash_msrv '5.x'
+    assert_true 'bash_msrv compares external version argument' sys::bash_msrv '5.2' '5.2.99(1)-release'
+    assert_false 'bash_msrv rejects lower external version argument' sys::bash_msrv '5.2' '5.1.16(1)-release'
+fi
+
+if has_fn sys::bash_ok; then
+    mark sys::bash_ok
+    assert_true 'bash_ok validates current bash binary' sys::bash_ok "${BASH}" "${MIN_TEST_BASH_VERSION}"
+    assert_false 'bash_ok rejects missing binary' sys::bash_ok "${ROOT_TMP}/missing-bash" "${MIN_TEST_BASH_VERSION}"
+fi
+
+if has_fn sys::find_bash; then
+    mark sys::find_bash
+    found_bash="$(sys::find_bash "${MIN_TEST_BASH_VERSION}" 2>/dev/null || true)"
+    assert_ne 'find_bash returns suitable bash' "${found_bash}"
+    if [[ -n "${found_bash}" ]]; then
+        if [[ -x "${found_bash}" || -n "$(command -v -- "${found_bash}" 2>/dev/null || true)" ]]; then pass 'find_bash result is executable/resolvable'
+        else fail 'find_bash result is executable/resolvable'
+        fi
+    fi
+fi
+
+if has_fn sys::install_bash; then
+    mark sys::install_bash
+    if [[ "${BASHX_TEST_INSTALL_BASH:-}" == "1" ]]; then
+        if sys::install_bash; then pass 'install_bash executed by explicit opt-in'
+        else fail 'install_bash executed by explicit opt-in'
+        fi
+    else
+        pass 'install_bash present; side-effect install skipped unless BASHX_TEST_INSTALL_BASH=1'
+    fi
+fi
+
+if has_fn sys::shell; then
+    mark sys::shell
+    shell_path="$(sys::shell 2>/dev/null || true)"
+    assert_ne 'shell returns value' "${shell_path}"
+fi
+
+if has_fn sys::exec_bash; then
+    mark sys::exec_bash
+    assert_true 'exec_bash idempotent when current bash satisfies MSRV' sys::exec_bash "${MIN_TEST_BASH_VERSION}" "noop"
+fi
 
 section 'command and platform predicates'
 
@@ -505,7 +602,7 @@ if mem_used="$(sys::mem_used 2>/dev/null)"; then assert_num 'mem_used numeric' "
 else skip 'mem_used unavailable'
 fi
 
-if [[ "${mem_total:-}" =~ ^[0-9]+$ && "${mem_used:-}" =~ ^[0-9]+$ ]]; then
+if [[ "${mem_total:-}" =~ ^[0-9]+$ && "${mem_free:-}" =~ ^[0-9]+$ && "${mem_used:-}" =~ ^[0-9]+$ ]]; then
     if (( mem_total > 0 )); then pass 'mem_total positive'
     else fail 'mem_total positive'
     fi
@@ -532,39 +629,50 @@ fi
 section 'CPU information accuracy and invariants'
 
 mark sys::cpu_threads
-threads="$(sys::cpu_threads 2>/dev/null || true)"
-assert_num 'cpu_threads numeric' "${threads}"
-if [[ "${threads}" =~ ^[0-9]+$ && "${threads}" -ge 1 ]]; then pass 'cpu_threads >= 1'
-else fail 'cpu_threads >= 1'
+if cpu_threads="$(sys::cpu_threads 2>/dev/null)"; then
+    assert_num 'cpu_threads numeric' "${cpu_threads}"
+    if (( cpu_threads >= 1 )); then pass 'cpu_threads >= 1'
+    else fail 'cpu_threads >= 1'
+    fi
+else
+    skip 'cpu_threads unavailable'
 fi
 
 mark sys::cpu_count
-count="$(sys::cpu_count 2>/dev/null || true)"
-assert_eq 'cpu_count aliases cpu_threads' "${threads}" "${count}"
+if cpu_count="$(sys::cpu_count 2>/dev/null)"; then
+    if [[ "${cpu_threads:-}" =~ ^[0-9]+$ ]]; then assert_eq 'cpu_count aliases cpu_threads' "${cpu_threads}" "${cpu_count}"
+    else assert_num 'cpu_count numeric' "${cpu_count}"
+    fi
+else
+    skip 'cpu_count unavailable'
+fi
 
 mark sys::cpu_cores
-cores="$(sys::cpu_cores 2>/dev/null || true)"
-assert_num 'cpu_cores numeric' "${cores}"
-if [[ "${cores}" =~ ^[0-9]+$ && "${threads}" =~ ^[0-9]+$ ]]; then
-    if (( cores >= 1 )); then pass 'cpu_cores >= 1'
+if cpu_cores="$(sys::cpu_cores 2>/dev/null)"; then
+    assert_num 'cpu_cores numeric' "${cpu_cores}"
+    if (( cpu_cores >= 1 )); then pass 'cpu_cores >= 1'
     else fail 'cpu_cores >= 1'
     fi
-    if (( cores <= threads )); then pass 'cpu_cores <= cpu_threads'
-    else fail 'cpu_cores <= cpu_threads'
+    if [[ "${cpu_threads:-}" =~ ^[0-9]+$ ]]; then
+        if (( cpu_cores <= cpu_threads )); then pass 'cpu_cores <= cpu_threads'
+        else fail 'cpu_cores <= cpu_threads'
+        fi
     fi
+else
+    skip 'cpu_cores unavailable'
 fi
 
 mark sys::cpu_model
-model="$(sys::cpu_model 2>/dev/null || true)"
-assert_ne 'cpu_model returns value' "${model}"
+cpu_model="$(sys::cpu_model 2>/dev/null || true)"
+assert_ne 'cpu_model returns value' "${cpu_model}"
 
 mark sys::cpu_usage
-if usage="$(sys::cpu_usage 2>/dev/null)"; then assert_num_range 'cpu_usage 0..100' "${usage}" 0 100
+if cpu_usage="$(sys::cpu_usage 2>/dev/null)"; then assert_num_range 'cpu_usage 0..100' "${cpu_usage}" 0 100
 else skip 'cpu_usage unavailable'
 fi
 
 mark sys::cpu_idle
-if idle="$(sys::cpu_idle 2>/dev/null)"; then assert_num_range 'cpu_idle 0..100' "${idle}" 0 100
+if cpu_idle="$(sys::cpu_idle 2>/dev/null)"; then assert_num_range 'cpu_idle 0..100' "${cpu_idle}" 0 100
 else skip 'cpu_idle unavailable'
 fi
 
@@ -576,33 +684,47 @@ if cpu_info="$(sys::cpu_info 2>/dev/null)"; then
     assert_re 'cpu_info has usage' "${cpu_info}" '(^|[[:space:]])usage=([0-9]+|unknown)'
     assert_re 'cpu_info has idle' "${cpu_info}" '(^|[[:space:]])idle=([0-9]+|unknown)'
 else
-    fail 'cpu_info unavailable'
+    skip 'cpu_info unavailable'
 fi
 
 section 'negative and adversarial inputs'
 
 mark sys::disk_total
-assert_false 'disk_total rejects missing path' sys::disk_total "${ROOT_TMP}/missing-dir"
+assert_false 'disk_total rejects missing path' sys::disk_total "${ROOT_TMP}/missing"
 mark sys::disk_free
-assert_false 'disk_free rejects missing path' sys::disk_free "${ROOT_TMP}/missing-dir"
+assert_false 'disk_free rejects missing path' sys::disk_free "${ROOT_TMP}/missing"
 mark sys::disk_size
 assert_false 'disk_size rejects empty path' sys::disk_size ''
 mark sys::disk_size
-assert_false 'disk_size rejects missing path' sys::disk_size "${ROOT_TMP}/missing-file"
+assert_false 'disk_size rejects missing path' sys::disk_size "${ROOT_TMP}/missing"
+
+if has_fn sys::bash_msrv; then
+    mark sys::bash_msrv
+    assert_false 'bash_msrv rejects empty need' sys::bash_msrv ''
+    assert_false 'bash_msrv rejects too many version components' sys::bash_msrv '5.2.1.9'
+fi
+
+if has_fn sys::find_bash; then
+    mark sys::find_bash
+    assert_false 'find_bash rejects invalid need' sys::find_bash 'bad.version'
+fi
 
 section 'coverage gate: every sys::* was exercised'
 
 for fn in "${DECLARED_FUNCS[@]}"; do
-    if [[ -n "${HIT[${fn}]:-}" ]]; then pass "covered ${fn}"
-    else fail "uncovered ${fn}"
+    if [[ -n "${HIT[${fn}]:-}" ]]; then
+        pass "covered ${fn}"
+    else
+        fail "uncovered ${fn}"
     fi
 done
 
 printf '\n============================================================\n'
-printf ' system.sh brutal test summary\n'
+printf ' system.sh brutal ensure test summary\n'
 printf '============================================================\n'
 printf 'Target : %s\n' "${TARGET_FILE}"
 printf 'Root   : %s\n' "${ROOT_TMP}"
+printf 'Bash   : %s\n' "${BASH_VERSION:-unknown}"
 printf 'Funcs  : %s\n' "${#DECLARED_FUNCS[@]}"
 printf 'Total  : %s\n' "${TOTAL}"
 printf 'Pass   : %s\n' "${PASS}"

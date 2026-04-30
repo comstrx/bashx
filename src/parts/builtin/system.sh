@@ -715,6 +715,17 @@ sys::loadavg () {
     return 1
 
 }
+sys::shell () {
+
+    local v=""
+
+    v="${BASH:-}"
+    [[ -n "${v}" ]] || v="${0:-}"
+    [[ -n "${v}" ]] || return 1
+
+    printf '%s\n' "${v}"
+
+}
 sys::hostname () {
 
     local v=""
@@ -948,8 +959,10 @@ sys::mem_total () {
 
     fi
     if sys::is_macos; then
+
         v="$(sysctl -n hw.memsize 2>/dev/null || true)"
         [[ "${v}" =~ ^[0-9]+$ ]] && { printf '%s\n' "${v}"; return 0; }
+
     fi
     if sys::is_windows; then
 
@@ -1174,12 +1187,14 @@ sys::cpu_usage () {
     if sys::is_linux && [[ -r /proc/stat ]]; then
 
         read -r _ a b c d e f g h i j < /proc/stat || return 1
+
         idle_a=$(( d + e ))
         total_a=$(( a + b + c + d + e + f + g + h + i + j ))
 
         sleep 1
 
         read -r _ a b c d e f g h i j < /proc/stat || return 1
+
         idle_b=$(( d + e ))
         total_b=$(( a + b + c + d + e + f + g + h + i + j ))
 
@@ -1189,6 +1204,7 @@ sys::cpu_usage () {
         (( diff_total > 0 )) || return 1
 
         usage=$(( ( 100 * ( diff_total - diff_idle ) ) / diff_total ))
+
         (( usage < 0 )) && usage=0
         (( usage > 100 )) && usage=100
 
@@ -1265,5 +1281,209 @@ sys::cpu_info () {
     fi
 
     printf '%s\n' "model=${model}" "cores=${cores}" "threads=${threads}" "usage=${usage}" "idle=${idle}"
+
+}
+
+sys::bash_version () {
+
+    local v="${BASH_VERSION:-}"
+
+    [[ -n "${v}" ]] || return 1
+
+    printf '%s\n' "${v}"
+
+}
+sys::bash_major () {
+
+    local v="${BASH_VERSINFO[0]:-}"
+
+    [[ "${v}" =~ ^[0-9]+$ ]] || return 1
+    printf '%s\n' "${v}"
+
+}
+sys::bash_minor () {
+
+    local v="${BASH_VERSINFO[1]:-}"
+
+    [[ "${v}" =~ ^[0-9]+$ ]] || return 1
+    printf '%s\n' "${v}"
+
+}
+sys::bash_msrv () {
+
+    local need="${1:-}" cur="${2:-${BASH_VERSION:-}}" n1=0 n2=0 n3=0 c1=0 c2=0 c3=0
+
+    [[ "${need}" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] || return 1
+    [[ "${cur}" =~ ^([0-9]+)([.]([0-9]+))?([.]([0-9]+))? ]] || return 1
+
+    IFS=. read -r n1 n2 n3 <<< "${need}"
+
+    c1="${BASH_REMATCH[1]:-0}"
+    c2="${BASH_REMATCH[3]:-0}"
+    c3="${BASH_REMATCH[5]:-0}"
+
+    n1="${n1:-0}"; n2="${n2:-0}"; n3="${n3:-0}"
+    c1="${c1:-0}"; c2="${c2:-0}"; c3="${c3:-0}"
+
+    (( c1 > n1 )) && return 0
+    (( c1 < n1 )) && return 1
+
+    (( c2 > n2 )) && return 0
+    (( c2 < n2 )) && return 1
+
+    (( c3 >= n3 ))
+
+}
+sys::bash_ok () {
+
+    local bin="${1:-}" need="${2:-}" cur=""
+
+    [[ -n "${bin}" && -n "${need}" ]] || return 1
+
+    sys::has "${bin}" && bin="$(command -v -- "${bin}" 2>/dev/null || true)"
+
+    [[ -x "${bin}" ]] || return 1
+
+    cur="$("${bin}" -c 'printf "%s\n" "${BASH_VERSION:-}"' 2>/dev/null || true)"
+    sys::bash_msrv "${need}" "${cur}"
+
+}
+sys::find_bash () {
+
+    local need="${1:-}" bin="" resolved=""
+
+    [[ "${need}" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] || return 1
+
+    for bin in \
+        "${BASHX_BASH:-}" \
+        bash \
+        /opt/homebrew/bin/bash \
+        /usr/local/bin/bash \
+        /usr/bin/bash \
+        /bin/bash \
+        /mingw64/bin/bash.exe \
+        /usr/bin/bash.exe \
+        /c/Program\ Files/Git/bin/bash.exe \
+        /c/Program\ Files/Git/usr/bin/bash.exe
+    do
+
+        [[ -n "${bin}" ]] || continue
+
+        if sys::has "${bin}"; then resolved="$(command -v -- "${bin}" 2>/dev/null || true)"
+        else resolved="${bin}"
+        fi
+
+        sys::bash_ok "${resolved}" "${need}" || continue
+        printf '%s\n' "${resolved}"
+
+        return 0
+
+    done
+
+    return 1
+
+}
+sys::install_bash () {
+
+    local manager=""
+
+    manager="$(sys::manager 2>/dev/null || true)"
+    [[ -n "${manager}" && "${manager}" != "unknown" ]] || return 1
+
+    case "${manager}" in
+        apt)
+            if sys::is_root; then apt-get update -y && apt-get install -y bash
+            else sys::can_sudo && sudo apt-get update -y && sudo apt-get install -y bash
+            fi
+        ;;
+        apk)
+            if sys::is_root; then apk add --no-cache bash
+            else sys::can_sudo && sudo apk add --no-cache bash
+            fi
+        ;;
+        dnf)
+            if sys::is_root; then dnf install -y bash
+            else sys::can_sudo && sudo dnf install -y bash
+            fi
+        ;;
+        yum)
+            if sys::is_root; then yum install -y bash
+            else sys::can_sudo && sudo yum install -y bash
+            fi
+        ;;
+        pacman)
+            if sys::is_root; then pacman -S --needed --noconfirm bash
+            else sys::can_sudo && sudo pacman -S --needed --noconfirm bash
+            fi
+        ;;
+        zypper)
+            if sys::is_root; then zypper --non-interactive install bash
+            else sys::can_sudo && sudo zypper --non-interactive install bash
+            fi
+        ;;
+        xbps)
+            if sys::is_root; then xbps-install -Sy bash
+            else sys::can_sudo && sudo xbps-install -Sy bash
+            fi
+        ;;
+        brew)
+            brew install bash
+        ;;
+        port)
+            if sys::is_root; then port install bash
+            else sys::can_sudo && sudo port install bash
+            fi
+        ;;
+        winget)
+            winget upgrade --id Git.Git -e --accept-source-agreements --accept-package-agreements ||
+            winget install --id Git.Git -e --accept-source-agreements --accept-package-agreements
+        ;;
+        scoop)
+            scoop update git || scoop install git
+        ;;
+        choco)
+            choco upgrade git -y || choco install git -y
+        ;;
+        *)
+            return 1
+        ;;
+    esac
+
+}
+sys::ensure_bash () {
+
+    local need="${1:-}" found="" script=""
+
+    if [[ "${need}" =~ ^[0-9]+([.][0-9]+){0,2}$ ]]; then shift || true
+    else need="${MIN_BASH_VERSION:-${MSRV_BASH_VERSION:-${MSRV_VERSION:-5}}}"
+    fi
+
+    [[ "${need}" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] || exit 1
+
+    if sys::bash_msrv "${need}"; then
+        export ENSURE_MIN_BASH_VERSION_DONE=1
+        return 0
+    fi
+
+    [[ "${ENSURE_MIN_BASH_VERSION_DONE:-}" == "1" ]] && exit 1
+
+    found="$(sys::find_bash "${need}" 2>/dev/null || true)"
+
+    if [[ -z "${found}" ]]; then
+
+        sys::install_bash || exit 1
+        hash -r 2>/dev/null || true
+        found="$(sys::find_bash "${need}" 2>/dev/null || true)"
+
+    fi
+
+    [[ -n "${found}" ]] || exit 1
+
+    script="${BASH_SOURCE[-1]:-${0:-}}"
+
+    [[ -n "${script}" && -f "${script}" ]] || script="${0:-}"
+    [[ -n "${script}" ]] || exit 1
+
+    ENSURE_MIN_BASH_VERSION_DONE=1 exec "${found}" "${script}" "$@"
 
 }
