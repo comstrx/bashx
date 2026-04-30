@@ -1505,8 +1505,6 @@ sys::ensure_bash () {
     fi
 
     [[ "${need}" =~ ^[0-9]+([.][0-9]+){0,2}$ ]] || exit 1
-
-    sys::bash_msrv "${need}" && { echo "bash skipped : ${need}"; }
     sys::bash_msrv "${need}" && { export ENSURE_MIN_BASH_VERSION_DONE=1; return 0; }
 
     [[ "${ENSURE_MIN_BASH_VERSION_DONE:-}" == "1" ]] && exit 1

@@ -19,14 +19,19 @@ defaults:
 
 jobs:
   test:
-    name: ${{ matrix.os }}
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
 
     strategy:
       fail-fast: false
-
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - name: linux
+            os: ubuntu-latest
+          - name: macos
+            os: macos-latest
+          - name: windows
+            os: windows-latest
 
     steps:
       - uses: actions/checkout@v4
