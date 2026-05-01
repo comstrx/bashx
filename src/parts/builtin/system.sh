@@ -584,6 +584,7 @@ sys::distro () {
     return 1
 
 }
+
 sys::arch () {
 
     local v="" lower=""
@@ -769,6 +770,7 @@ sys::ip () {
     return 1
 
 }
+
 sys::locale () {
 
     local v=""
@@ -860,65 +862,6 @@ sys::username () {
 
 }
 
-sys::which () {
-
-    local bin="${1:-}" v=""
-
-    [[ -n "${bin}" ]] || return 1
-    [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
-
-    v="$(command -v -- "${bin}" 2>/dev/null || true)"
-    [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
-
-    if sys::is_windows; then
-        for v in ".exe" ".cmd" ".bat" ".ps1"; do
-            command -v -- "${bin}${v}" >/dev/null 2>&1 || continue
-            command -v -- "${bin}${v}" 2>/dev/null
-            return 0
-        done
-    fi
-
-    return 1
-
-}
-sys::which_all () {
-
-    local bin="${1:-}" path_value="${PATH:-}" sep="" dir="" entry="" ext="" found=1
-    local -a dirs=() exts=()
-
-    [[ -n "${bin}" ]] || return 1
-    [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
-
-    case "${path_value}" in
-        *";"*) sep=";" ;;
-        *)     sep=":" ;;
-    esac
-
-    IFS="${sep}" read -r -a dirs <<< "${path_value}"
-
-    if sys::is_windows; then exts=( "" ".exe" ".cmd" ".bat" ".ps1" )
-    else exts=( "" )
-    fi
-
-    for dir in "${dirs[@]}"; do
-
-        [[ -n "${dir}" ]] || continue
-
-        for ext in "${exts[@]}"; do
-
-            entry="${dir%/}/${bin}${ext}"
-            [[ -f "${entry}" && -x "${entry}" ]] || continue
-
-            printf '%s\n' "${entry}"
-            found=0
-
-        done
-
-    done
-
-    return "${found}"
-
-}
 sys::path_name () {
 
     if sys::is_windows; then printf '%s\n' "Path"
@@ -976,6 +919,66 @@ sys::path_dirs () {
     done
 
     [[ -n "${path_value}" ]] && printf '%s\n' "${path_value}"
+
+}
+
+sys::which () {
+
+    local bin="${1:-}" v=""
+
+    [[ -n "${bin}" ]] || return 1
+    [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
+
+    v="$(command -v -- "${bin}" 2>/dev/null || true)"
+    [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+    if sys::is_windows; then
+        for v in ".exe" ".cmd" ".bat" ".ps1"; do
+            command -v -- "${bin}${v}" >/dev/null 2>&1 || continue
+            command -v -- "${bin}${v}" 2>/dev/null
+            return 0
+        done
+    fi
+
+    return 1
+
+}
+sys::which_all () {
+
+    local bin="${1:-}" path_value="${PATH:-}" sep="" dir="" entry="" ext="" found=1
+    local -a dirs=() exts=()
+
+    [[ -n "${bin}" ]] || return 1
+    [[ "${bin}" != *$'\n'* && "${bin}" != *$'\r'* ]] || return 1
+
+    case "${path_value}" in
+        *";"*) sep=";" ;;
+        *)     sep=":" ;;
+    esac
+
+    IFS="${sep}" read -r -a dirs <<< "${path_value}"
+
+    if sys::is_windows; then exts=( "" ".exe" ".cmd" ".bat" ".ps1" )
+    else exts=( "" )
+    fi
+
+    for dir in "${dirs[@]}"; do
+
+        [[ -n "${dir}" ]] || continue
+
+        for ext in "${exts[@]}"; do
+
+            entry="${dir%/}/${bin}${ext}"
+            [[ -f "${entry}" && -x "${entry}" ]] || continue
+
+            printf '%s\n' "${entry}"
+            found=0
+
+        done
+
+    done
+
+    return "${found}"
 
 }
 sys::open () {
@@ -1584,10 +1587,7 @@ sys::bash_msrv () {
 
     IFS=. read -r n1 n2 n3 <<< "${need}"
 
-    c1="${BASH_REMATCH[1]:-0}"
-    c2="${BASH_REMATCH[3]:-0}"
-    c3="${BASH_REMATCH[5]:-0}"
-
+    c1="${BASH_REMATCH[1]:-0}"; c2="${BASH_REMATCH[3]:-0}"; c3="${BASH_REMATCH[5]:-0}"
     n1="${n1:-0}"; n2="${n2:-0}"; n3="${n3:-0}"
     c1="${c1:-0}"; c2="${c2:-0}"; c3="${c3:-0}"
 
