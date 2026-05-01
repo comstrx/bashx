@@ -721,7 +721,6 @@ user::home () {
         [[ -n "${USERPROFILE:-}" ]] && sys::is_windows && { printf '%s\n' "${USERPROFILE}"; return 0; }
 
     fi
-
     if sys::is_linux; then
 
         if sys::has getent; then
@@ -760,9 +759,18 @@ user::home () {
                 # shellcheck disable=SC2016
                 v="$(SYS_USER_QUERY="${user}" powershell.exe -NoProfile -NonInteractive -Command '
                     try {
-                        $sid = ( Get-LocalUser -Name $env:SYS_USER_QUERY -ErrorAction Stop ).SID.Value
+                        $u = Get-LocalUser -Name $env:SYS_USER_QUERY -ErrorAction Stop
+                        $sid = $u.SID.Value
                         $p = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid"
-                        ( Get-ItemProperty -Path $p -ErrorAction Stop ).ProfileImagePath
+
+                        try {
+                            $home = ( Get-ItemProperty -Path $p -ErrorAction Stop ).ProfileImagePath
+                            if ( $home ) { $home; exit 0 }
+                        } catch {}
+
+                        $base = $env:SystemDrive + "\Users\"
+                        $path = $base + $env:SYS_USER_QUERY
+                        $path
                         exit 0
                     } catch {
                         exit 1
