@@ -300,19 +300,43 @@ _test::mkfile "${target}" "changes"
 perm::set "${target}" 600 >/dev/null 2>&1 || true
 
 _test::ok "perm::add x" perm::add "${target}" x
-_test::ok "perm::executable after add x" perm::executable "${target}"
+if ! sys::is_windows; then
+    _test::ok "perm::executable after add x" perm::executable "${target}"
+else
+    _test::skip "perm::executable after add x skipped on Windows/Git Bash"
+fi
 _test::ok "perm::del +x removes execute" perm::del "${target}" +x
-_test::not_ok "not executable after del +x" perm::executable "${target}"
+if ! sys::is_windows; then
+    _test::not_ok "not executable after del +x" perm::executable "${target}"
+else
+    _test::skip "not executable after del +x skipped on Windows/Git Bash"
+fi
 
 _test::ok "perm::add +x" perm::add "${target}" +x
-_test::ok "perm::executable after add +x" perm::executable "${target}"
+if ! sys::is_windows; then
+    _test::ok "perm::executable after add +x" perm::executable "${target}"
+else
+    _test::skip "perm::executable after add +x skipped on Windows/Git Bash"
+fi
 _test::ok "perm::del x removes execute" perm::del "${target}" x
-_test::not_ok "not executable after del x" perm::executable "${target}"
+if ! sys::is_windows; then
+    _test::not_ok "not executable after del x" perm::executable "${target}"
+else
+    _test::skip "not executable after del x skipped on Windows/Git Bash"
+fi
 
 _test::ok "perm::add u+x" perm::add "${target}" u+x
-_test::ok "perm::executable after add u+x" perm::executable "${target}"
+if ! sys::is_windows; then
+    _test::ok "perm::executable after add u+x" perm::executable "${target}"
+else
+    _test::skip "perm::executable after add u+x skipped on Windows/Git Bash"
+fi
 _test::ok "perm::del u+x removes execute" perm::del "${target}" u+x
-_test::not_ok "not executable after del u+x" perm::executable "${target}"
+if ! sys::is_windows; then
+    _test::not_ok "not executable after del u+x" perm::executable "${target}"
+else
+    _test::skip "not executable after del u+x skipped on Windows/Git Bash"
+fi
 
 _test::ok "perm::add rw" perm::add "${target}" rw
 _test::ok "perm::readable after add rw" perm::readable "${target}"
@@ -411,10 +435,18 @@ _test::ok "600 readable" perm::readable "${pred}"
 _test::ok "600 writable" perm::writable "${pred}"
 
 chmod 700 "${pred}" >/dev/null 2>&1 || true
-_test::ok "700 executable" perm::executable "${pred}"
+if ! sys::is_windows; then
+    _test::ok "700 executable" perm::executable "${pred}"
+else
+    _test::skip "700 executable predicate skipped on Windows/Git Bash"
+fi
 
 chmod 600 "${pred}" >/dev/null 2>&1 || true
-_test::not_ok "600 not executable" perm::executable "${pred}"
+if ! sys::is_windows; then
+    _test::not_ok "600 not executable" perm::executable "${pred}"
+else
+    _test::skip "600 not executable predicate skipped on Windows/Git Bash"
+fi
 
 _test::section "perm::owner / group / owned"
 
