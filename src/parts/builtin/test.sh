@@ -238,19 +238,19 @@ printf "code:%s\n" "${value}" > "${out}"
 ' "${TEST_ROOT}/group-lock-code.out" "ok"
 _expect_eq "group::lock bash -c code output" "code:ok" "$(cat "${TEST_ROOT}/group-lock-code.out" 2>/dev/null || true)"
 
-_expect_ok "user::lock heredoc code mode" user::lock "__test_user_lock_heredoc" -- "${TEST_ROOT}/user-lock-heredoc.out" "ok" <<'SH'
+_expect_ok "user::lock stdin code mode" user::lock "__test_user_lock_stdin" --stdin "${TEST_ROOT}/user-lock-heredoc.out" "ok" <<'SH'
 out="${1:-}"
 value="${2:-}"
-printf "heredoc:%s\n" "${value}" > "${out}"
+printf "stdin:%s\n" "${value}" > "${out}"
 SH
-_expect_eq "user::lock heredoc output" "heredoc:ok" "$(cat "${TEST_ROOT}/user-lock-heredoc.out" 2>/dev/null || true)"
+_expect_eq "user::lock stdin output" "stdin:ok" "$(cat "${TEST_ROOT}/user-lock-heredoc.out" 2>/dev/null || true)"
 
 _expect_ok "group::lock heredoc code mode" group::lock "__test_group_lock_heredoc" -- "${TEST_ROOT}/group-lock-heredoc.out" "ok" <<'SH'
 out="${1:-}"
 value="${2:-}"
 printf "heredoc:%s\n" "${value}" > "${out}"
 SH
-_expect_eq "group::lock heredoc output" "heredoc:ok" "$(cat "${TEST_ROOT}/group-lock-heredoc.out" 2>/dev/null || true)"
+_expect_eq "group::lock stdin output" "stdin:ok" "$(cat "${TEST_ROOT}/group-lock-heredoc.out" 2>/dev/null || true)"
 
 mkdir -p -- "${TMPDIR:-/tmp}/bash-permissions-locks/__test_user_stale.lock" >/dev/null 2>&1 || true
 printf '999999999\n' > "${TMPDIR:-/tmp}/bash-permissions-locks/__test_user_stale.lock/pid" 2>/dev/null || true
