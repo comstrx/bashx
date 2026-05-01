@@ -1025,10 +1025,50 @@ group::all () {
     if sys::is_windows; then
 
         if sys::has powershell.exe; then
-            powershell.exe -NoProfile -NonInteractive -Command "Get-LocalGroup | Select-Object -ExpandProperty Name" 2>/dev/null | tr -d '\r' | awk 'NF && !seen[$0]++ { print }'
+
+            if [[ -n "${user}" ]]; then
+
+                # shellcheck disable=SC2016
+                v="$(SYS_USER_QUERY="${user}" powershell.exe -NoProfile -NonInteractive -Command '
+                    try {
+                        $u = $env:SYS_USER_QUERY
+                        Get-LocalUser -Name $u -ErrorAction Stop | Out-Null
+
+                        Get-LocalGroup | ForEach-Object {
+                            try {
+                                $name = $_.Name
+                                $hit = Get-LocalGroupMember -Group $name -ErrorAction Stop | Where-Object {
+                                    $short = ( $_.Name -split "\\" )[ -1 ]
+                                    $short -eq $u -or $_.Name -eq $u
+                                }
+
+                                if ( $hit ) { $name }
+                            } catch {}
+                        }
+
+                        exit 0
+                    } catch {
+                        exit 1
+                    }
+                ' 2>/dev/null | tr -d '\r' | awk 'NF && !seen[$0]++ { print }' || true)"
+
+                [[ -n "${v}" ]] || return 1
+                printf '%s\n' "${v}"
+
+                return 0
+
+            fi
+
+            powershell.exe -NoProfile -NonInteractive -Command "Get-LocalGroup | Select-Object -ExpandProperty Name" 2>/dev/null |
+                tr -d '\r' |
+                awk 'NF && !seen[$0]++ { print }'
+
             return
+
         fi
         if sys::has net.exe; then
+
+            [[ -n "${user}" ]] && return 1
 
             net.exe localgroup 2>/dev/null | tr -d '\r' | awk '
                 BEGIN { cap = 0 }
