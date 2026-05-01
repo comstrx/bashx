@@ -96,7 +96,7 @@ user::exists () {
 
     fi
 
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         if sys::has getent; then
             getent passwd "${user}" >/dev/null 2>&1 || return 1
@@ -152,7 +152,7 @@ user::all () {
 
     if [[ -z "${group}" ]]; then
 
-        if sys::is_linux || sys::is_wsl; then
+        if sys::is_linux; then
 
             if sys::has getent; then
                 getent passwd 2>/dev/null | awk -F: '{ print $1 }' | awk 'NF && !seen[$0]++ { print }'
@@ -219,7 +219,7 @@ user::all () {
         return
 
     fi
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         while IFS=: read -r _user _x _uid _gid _rest || [[ -n "${_user:-}" ]]; do
 
@@ -293,7 +293,7 @@ user::add () {
 
     group::exists "${group}" || return 1
 
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         if sys::has useradd; then
             useradd -m -g "${group}" "${user}" >/dev/null 2>&1
@@ -385,7 +385,7 @@ user::del () {
 
     user::exists "${user}" || return 0
 
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         if sys::has userdel; then
             userdel "${user}" >/dev/null 2>&1
@@ -517,7 +517,7 @@ user::add_group () {
     group::exists "${group}" || return 1
     user::exists "${user}" "${group}" && return 0
 
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         if sys::has usermod; then
             usermod -a -G "${group}" "${user}" >/dev/null 2>&1
@@ -578,7 +578,7 @@ user::del_group () {
     group::exists "${group}" || return 1
     user::exists "${user}" "${group}" || return 0
 
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         if sys::has gpasswd; then
             gpasswd -d "${user}" "${group}" >/dev/null 2>&1
@@ -639,7 +639,7 @@ user::shell () {
         printf '%s\n' "${SHELL}"
         return 0
     fi
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         if sys::has getent; then
             v="$(getent passwd "${user}" 2>/dev/null | awk -F: 'NR == 1 { print $7 }')"
@@ -702,7 +702,7 @@ user::home () {
 
     fi
 
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         if sys::has getent; then
             v="$(getent passwd "${user}" 2>/dev/null | awk -F: 'NR == 1 { print $6 }')"
@@ -916,7 +916,7 @@ group::exists () {
     [[ -n "${group}" ]] || return 1
     [[ "${group}" != *$'\n'* && "${group}" != *$'\r'* ]] || return 1
 
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         if sys::has getent; then
             getent group "${group}" >/dev/null 2>&1 || return 1
@@ -965,73 +965,20 @@ group::all () {
     current="$(user::name 2>/dev/null || true)"
     [[ "${user}" != *$'\n'* && "${user}" != *$'\r'* ]] || return 1
 
-    if [[ -n "${user}" ]]; then
-
-        if sys::is_windows && sys::has powershell.exe; then
-
-            # shellcheck disable=SC2016
-            SYS_USER_QUERY="${user}" powershell.exe -NoProfile -NonInteractive -Command '
-                $u = $env:SYS_USER_QUERY
-                Get-LocalGroup | ForEach-Object {
-                    try {
-                        $name = $_.Name
-                        $hit = Get-LocalGroupMember -Group $name -ErrorAction Stop | Where-Object {
-                            $short = ( $_.Name -split "\\" )[ -1 ]
-                            $short -eq $u -or $_.Name -eq $u
-                        }
-                        if ( $hit ) { $name }
-                    } catch {}
-                }
-            ' 2>/dev/null | tr -d '\r' | awk 'NF && !seen[$0]++ { print }'
-
-            return
-
-        fi
-        if sys::has id; then
-
-            if [[ -n "${current}" && "${user}" == "${current}" ]]; then v="$(id -Gn 2>/dev/null || true)"
-            else v="$(id -Gn "${user}" 2>/dev/null || true)"
-            fi
-
-            [[ -n "${v}" ]] || return 1
-            for x in ${v}; do printf '%s\n' "${x}"; done | awk 'NF && !seen[$0]++ { print }'
-
-            return 0
-
-        fi
-
-        return 1
-
-    fi
-    if sys::is_linux || sys::is_wsl; then
-
-        if sys::has getent; then
-            getent group 2>/dev/null | awk -F: '{ print $1 }' | awk 'NF && !seen[$0]++ { print }'
-            return
-        fi
-
-        [[ -r /etc/group ]] || return 1
-        awk -F: '{ print $1 }' /etc/group 2>/dev/null | awk 'NF && !seen[$0]++ { print }'
-        return
-
-    fi
-    if sys::is_macos; then
-
-        sys::has dscl || return 1
-        dscl . -list /Groups 2>/dev/null | awk 'NF && !seen[$0]++ { print }'
-        return
-
-    fi
     if sys::is_windows; then
 
         if sys::has powershell.exe; then
 
             if [[ -n "${user}" ]]; then
 
+                user::exists "${user}" || return 1
+
                 # shellcheck disable=SC2016
                 v="$(SYS_USER_QUERY="${user}" powershell.exe -NoProfile -NonInteractive -Command '
+                    $u = $env:SYS_USER_QUERY
+                    $out = @()
+
                     try {
-                        $u = $env:SYS_USER_QUERY
                         Get-LocalUser -Name $u -ErrorAction Stop | Out-Null
 
                         Get-LocalGroup | ForEach-Object {
@@ -1042,35 +989,46 @@ group::all () {
                                     $short -eq $u -or $_.Name -eq $u
                                 }
 
-                                if ( $hit ) { $name }
+                                if ( $hit ) { $out += $name }
                             } catch {}
                         }
 
+                        if ( $out.Count -lt 1 ) { exit 1 }
+
+                        $out | Select-Object -Unique
                         exit 0
                     } catch {
                         exit 1
                     }
-                ' 2>/dev/null | tr -d '\r' | awk 'NF && !seen[$0]++ { print }' || true)"
+                ' 2>/dev/null | tr -d '\r' || true)"
 
                 [[ -n "${v}" ]] || return 1
-                printf '%s\n' "${v}"
+                printf '%s\n' "${v}" | awk 'NF && !seen[$0]++ { print }'
 
                 return 0
 
             fi
 
-            powershell.exe -NoProfile -NonInteractive -Command "Get-LocalGroup | Select-Object -ExpandProperty Name" 2>/dev/null |
-                tr -d '\r' |
-                awk 'NF && !seen[$0]++ { print }'
+            v="$(powershell.exe -NoProfile -NonInteractive -Command '
+                try {
+                    Get-LocalGroup | Select-Object -ExpandProperty Name
+                    exit 0
+                } catch {
+                    exit 1
+                }
+            ' 2>/dev/null | tr -d '\r' || true)"
 
-            return
+            [[ -n "${v}" ]] || return 1
+            printf '%s\n' "${v}" | awk 'NF && !seen[$0]++ { print }'
+
+            return 0
 
         fi
         if sys::has net.exe; then
 
             [[ -n "${user}" ]] && return 1
 
-            net.exe localgroup 2>/dev/null | tr -d '\r' | awk '
+            v="$(net.exe localgroup 2>/dev/null | tr -d '\r' | awk '
                 BEGIN { cap = 0 }
                 /^---/ { cap = 1; next }
                 /^The command completed successfully\./ { cap = 0 }
@@ -1079,13 +1037,60 @@ group::all () {
                     sub(/^[[:space:]]+/, "", line)
                     if ( line != "" ) print line
                 }
-            ' | awk 'NF && !seen[$0]++ { print }'
+            ' || true)"
 
-            return
+            [[ -n "${v}" ]] || return 1
+            printf '%s\n' "${v}" | awk 'NF && !seen[$0]++ { print }'
+
+            return 0
 
         fi
 
         return 1
+
+    fi
+    if [[ -n "${user}" ]]; then
+
+        user::exists "${user}" || return 1
+
+        if sys::has id; then
+
+            if [[ -n "${current}" && "${user}" == "${current}" ]]; then v="$(id -Gn 2>/dev/null || true)"
+            else v="$(id -Gn "${user}" 2>/dev/null || true)"
+            fi
+
+            [[ -n "${v}" ]] || return 1
+
+            for x in ${v}; do
+                printf '%s\n' "${x}"
+            done | awk 'NF && !seen[$0]++ { print }'
+
+            return 0
+
+        fi
+
+        return 1
+
+    fi
+    if sys::is_linux; then
+
+        if sys::has getent; then
+            getent group 2>/dev/null | awk -F: '{ print $1 }' | awk 'NF && !seen[$0]++ { print }'
+            return
+        fi
+
+        [[ -r /etc/group ]] || return 1
+        awk -F: '{ print $1 }' /etc/group 2>/dev/null | awk 'NF && !seen[$0]++ { print }'
+
+        return
+
+    fi
+    if sys::is_macos; then
+
+        sys::has dscl || return 1
+        dscl . -list /Groups 2>/dev/null | awk 'NF && !seen[$0]++ { print }'
+
+        return
 
     fi
 
@@ -1101,7 +1106,7 @@ group::add () {
 
     group::exists "${group}" && return 0
 
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         if sys::has groupadd; then
             groupadd "${group}" >/dev/null 2>&1
@@ -1172,7 +1177,7 @@ group::del () {
 
     group::exists "${group}" || return 0
 
-    if sys::is_linux || sys::is_wsl; then
+    if sys::is_linux; then
 
         if sys::has groupdel; then
             groupdel "${group}" >/dev/null 2>&1
