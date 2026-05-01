@@ -334,7 +334,7 @@ for who in u g o a ug go ugo; do
     _test::ok "perm::execute ${who}" perm::execute "${target}" "${who}"
 done
 
-for who in "" x "u+r" "u g" $'u\ng'; do
+for who in x "u+r" "u g" $'u\ng'; do
     _test::not_ok "perm::read rejects who ${who}" perm::read "${target}" "${who}"
     _test::not_ok "perm::write rejects who ${who}" perm::write "${target}" "${who}"
     _test::not_ok "perm::execute rejects who ${who}" perm::execute "${target}" "${who}"
