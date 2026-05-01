@@ -1,16 +1,19 @@
 codingmaster@codingmstr:/var/www/projects/bashx$ bash -n src/parts/builtin/system.sh
 codingmaster@codingmstr:/var/www/projects/bashx$ shellcheck src/parts/builtin/system.sh -e SC2148
+codingmaster@codingmstr:/var/www/projects/bashx$ bash -n src/parts/builtin/user.sh
+codingmaster@codingmstr:/var/www/projects/bashx$ shellcheck src/parts/builtin/user.sh -e SC2148
 codingmaster@codingmstr:/var/www/projects/bashx$
 
 [[CI LINUX]]
 
-20s
 Run bash src/parts/builtin/test.sh
 [target] user.sh
 [env] os=linux runtime=linux user=root group=root mutate=1
 
 [0001] api presence
   PASS function exists: user::valid
+  PASS function exists: user::lock
+  PASS function exists: user::locked
   PASS function exists: user::id
   PASS function exists: user::name
   PASS function exists: user::exists
@@ -27,6 +30,8 @@ Run bash src/parts/builtin/test.sh
   PASS function exists: user::is_admin
   PASS function exists: user::can_sudo
   PASS function exists: group::valid
+  PASS function exists: group::lock
+  PASS function exists: group::locked
   PASS function exists: group::id
   PASS function exists: group::name
   PASS function exists: group::exists
@@ -36,42 +41,101 @@ Run bash src/parts/builtin/test.sh
   PASS function exists: group::users
   PASS function exists: group::add_user
   PASS function exists: group::del_user
+  PASS api count is 30
 
 [0002] validation API
   PASS user::valid accepts root
   PASS group::valid accepts root
   PASS user::valid accepts root
   PASS group::valid accepts root
-  PASS user::valid accepts bx78687439ua
-  PASS group::valid accepts bx78687439ua
-  PASS user::valid accepts bx78687439ga
-  PASS group::valid accepts bx78687439ga
+  PASS user::valid accepts bx29447761ua
+  PASS group::valid accepts bx29447761ua
+  PASS user::valid accepts bx29447761ga
+  PASS group::valid accepts bx29447761ga
   PASS user::valid accepts abc_123
   PASS group::valid accepts abc_123
   PASS user::valid accepts abc-123
   PASS group::valid accepts abc-123
-  PASS user::valid rejects hostile []
-  PASS group::valid rejects hostile []
-  PASS user::valid rejects hostile [*]
-  PASS group::valid rejects hostile [*]
-  PASS user::valid rejects hostile [?]
-  PASS group::valid rejects hostile [?]
-  PASS user::valid rejects hostile [[abc]]
-  PASS group::valid rejects hostile [[abc]]
-  PASS user::valid rejects hostile [bad/name]
-  PASS group::valid rejects hostile [bad/name]
-  PASS user::valid rejects hostile [bad\name]
-  PASS group::valid rejects hostile [bad\name]
-  PASS user::valid rejects hostile [bad
+  PASS user::valid accepts extended safe __lock_key
+  PASS group::valid accepts extended safe __lock_key
+  PASS user::valid accepts extended safe abc.def
+  PASS group::valid accepts extended safe abc.def
+  PASS user::valid accepts extended safe abc+def
+  PASS group::valid accepts extended safe abc+def
+  PASS user::valid accepts extended safe abc@def
+  PASS group::valid accepts extended safe abc@def
+  PASS user::valid accepts extended safe abc:def
+  PASS group::valid accepts extended safe abc:def
+  PASS user::valid accepts extended safe abc,def
+  PASS group::valid accepts extended safe abc,def
+  PASS user::valid accepts extended safe abc=def
+  PASS group::valid accepts extended safe abc=def
+  PASS user::valid rejects extended hostile [bad/path]
+  PASS group::valid rejects extended hostile [bad/path]
+  PASS user::valid rejects extended hostile [bad\path]
+  PASS group::valid rejects extended hostile [bad\path]
+  PASS user::valid rejects extended hostile [*]
+  PASS group::valid rejects extended hostile [*]
+  PASS user::valid rejects extended hostile [?]
+  PASS group::valid rejects extended hostile [?]
+  PASS user::valid rejects extended hostile [[abc]]
+  PASS group::valid rejects extended hostile [[abc]]
+  PASS user::valid rejects extended hostile [bad]]
+  PASS group::valid rejects extended hostile [bad]]
+  PASS user::valid rejects extended hostile [bad
 name]
-  PASS group::valid rejects hostile [bad
+  PASS group::valid rejects extended hostile [bad
 name]
-  PASS user::valid rejects hostile [bad
+  PASS user::valid rejects extended hostile [bad
 name]
-  PASS group::valid rejects hostile [bad
+  PASS group::valid rejects extended hostile [bad
 name]
 
-[0003] current identity reads
+[0003] lock API standalone
+  PASS user::lock function mode
+  PASS user::lock function mode output
+  PASS user::lock function failure preserves rc
+  PASS user::lock rejects invalid key empty
+  PASS user::lock rejects invalid key wildcard
+  PASS user::lock rejects missing runner
+  PASS user::lock rejects unknown function
+  PASS group::lock function mode
+  PASS group::lock function mode output
+  PASS group::lock function failure preserves rc
+  PASS group::lock rejects invalid key empty
+  PASS group::lock rejects invalid key wildcard
+  PASS group::lock rejects missing runner
+  PASS group::lock rejects unknown function
+  PASS user::lock bash -c code mode
+  PASS user::lock bash -c code output
+  PASS group::lock bash -c code mode
+  PASS group::lock bash -c code output
+  PASS user::lock heredoc code mode
+  PASS user::lock heredoc output
+  PASS group::lock heredoc code mode
+  PASS group::lock heredoc output
+  PASS user::lock clears stale lock
+  PASS user::lock stale output
+  PASS group::lock clears stale lock
+  PASS group::lock stale output
+
+[0004] locked API standalone
+  PASS user::locked absent lock fails
+  PASS group::locked absent lock fails
+  PASS user::locked rejects invalid empty
+  PASS user::locked rejects invalid wildcard
+  PASS group::locked rejects invalid empty
+  PASS group::locked rejects invalid wildcard
+  PASS user::locked active pid
+  PASS group::locked active pid
+  PASS user::locked pidless conservative locked
+  PASS group::locked pidless conservative locked
+  PASS user::locked stale pid fails
+  PASS group::locked stale pid fails
+  PASS user::locked stale dir removed
+  PASS group::locked stale dir removed
+
+[0005] current identity reads
   PASS user::name nonempty
   PASS user::id nonempty
   PASS user::id numeric
@@ -84,7 +148,7 @@ name]
   PASS user::name no CR/LF
   PASS group::name no CR/LF
 
-[0004] identity repeatability
+[0006] identity repeatability
   PASS repeat user::name 1
   PASS repeat user::id 1
   PASS repeat user::group 1
@@ -134,7 +198,7 @@ name]
   PASS repeat user::group 12
   PASS repeat group::id 12
 
-[0005] user::exists matrix
+[0007] user::exists matrix
   PASS current user exists
   PASS current user in current group
   PASS fake user missing
@@ -158,7 +222,7 @@ group]
   PASS user::exists rejects bad group [bad
 group]
 
-[0006] group::exists matrix
+[0008] group::exists matrix
   PASS current group exists
   PASS fake group missing
   PASS group::exists rejects bad group []
@@ -171,7 +235,7 @@ group]
   PASS group::exists rejects bad group [bad
 group]
 
-[0007] id matrices
+[0009] id matrices
   PASS implicit id equals explicit current
   PASS fake user id fails
   PASS implicit group id equals explicit current
@@ -193,7 +257,7 @@ x]
   PASS group::id rejects bad [bad
 x]
 
-[0008] list all users/groups
+[0010] list all users/groups
   PASS user::all nonempty
   PASS group::all nonempty
   PASS user::all contains current user
@@ -203,7 +267,7 @@ x]
   PASS user::all unique
   PASS group::all unique
 
-[0009] membership listing wrappers
+[0011] membership listing wrappers
   PASS user::groups current nonempty
   PASS group::users current nonempty
   PASS user::groups contains current group
@@ -215,7 +279,7 @@ x]
   PASS user::groups rejects wildcard
   PASS group::users rejects wildcard
 
-[0010] home and shell reads
+[0012] home and shell reads
   PASS implicit home nonempty
   PASS explicit home nonempty
   PASS implicit explicit home stable
@@ -225,7 +289,7 @@ x]
   PASS fake user home fails
   PASS fake user shell fails
 
-[0011] privilege checks
+[0013] privilege checks
   PASS user::is_root true branch
   PASS user::is_admin true branch
   PASS user::can_sudo true branch
@@ -234,14 +298,14 @@ x]
   PASS can_sudo fake user fails
   PASS non-windows can_sudo callable
 
-[0012] pre-mutation clean state
+[0014] pre-mutation clean state
   PASS user A absent
   PASS user B absent
   PASS group A absent
   PASS group B absent
   PASS group C absent
 
-[0013] group lifecycle destructive
+[0015] group lifecycle destructive
   PASS group add A
   PASS group exists A
   PASS group add A idempotent
@@ -256,7 +320,7 @@ x]
   PASS group del invalid empty
   PASS group del invalid wildcard
 
-[0014] user create-only strict lifecycle
+[0016] user create-only strict lifecycle
   PASS group add A
   PASS group add B
   PASS user add A in group A
@@ -282,7 +346,7 @@ x]
   PASS group del A
   PASS group del B
 
-[0015] membership lifecycle user namespace
+[0017] membership lifecycle user namespace
   PASS group add A
   PASS group add B
   PASS user add A in group A
@@ -304,7 +368,7 @@ x]
   PASS group del B
   PASS group del C
 
-[0016] membership lifecycle group namespace strict
+[0018] membership lifecycle group namespace strict
   PASS group add A
   PASS group add C
   PASS user add B in group A
@@ -324,7 +388,7 @@ x]
   PASS group del A
   PASS group del C
 
-[0017] delete safety and idempotency
+[0019] delete safety and idempotency
   PASS user::del empty rejects
   PASS user::del wildcard rejects
   PASS user::del newline rejects
@@ -335,79 +399,133 @@ x]
   PASS group::del newline rejects
   PASS group::del valid missing idempotent
 
-[0018] hostile input sweep
+[0020] hostile input sweep
+  PASS user::valid hostile *
+  PASS user::lock hostile *
+  PASS user::locked hostile *
   PASS user::exists hostile *
   PASS user::id hostile *
   PASS user::group hostile *
   PASS user::home hostile *
   PASS user::shell hostile *
   PASS user::groups hostile *
+  PASS group::valid hostile *
+  PASS group::lock hostile *
+  PASS group::locked hostile *
   PASS group::exists hostile *
   PASS group::id hostile *
   PASS group::users hostile *
+  PASS user::valid hostile ?
+  PASS user::lock hostile ?
+  PASS user::locked hostile ?
   PASS user::exists hostile ?
   PASS user::id hostile ?
   PASS user::group hostile ?
   PASS user::home hostile ?
   PASS user::shell hostile ?
   PASS user::groups hostile ?
+  PASS group::valid hostile ?
+  PASS group::lock hostile ?
+  PASS group::locked hostile ?
   PASS group::exists hostile ?
   PASS group::id hostile ?
   PASS group::users hostile ?
+  PASS user::valid hostile [abc]
+  PASS user::lock hostile [abc]
+  PASS user::locked hostile [abc]
   PASS user::exists hostile [abc]
   PASS user::id hostile [abc]
   PASS user::group hostile [abc]
   PASS user::home hostile [abc]
   PASS user::shell hostile [abc]
   PASS user::groups hostile [abc]
+  PASS group::valid hostile [abc]
+  PASS group::lock hostile [abc]
+  PASS group::locked hostile [abc]
   PASS group::exists hostile [abc]
   PASS group::id hostile [abc]
   PASS group::users hostile [abc]
+  PASS user::valid hostile bad/name
+  PASS user::lock hostile bad/name
+  PASS user::locked hostile bad/name
   PASS user::exists hostile bad/name
   PASS user::id hostile bad/name
   PASS user::group hostile bad/name
   PASS user::home hostile bad/name
   PASS user::shell hostile bad/name
   PASS user::groups hostile bad/name
+  PASS group::valid hostile bad/name
+  PASS group::lock hostile bad/name
+  PASS group::locked hostile bad/name
   PASS group::exists hostile bad/name
   PASS group::id hostile bad/name
   PASS group::users hostile bad/name
+  PASS user::valid hostile bad\name
+  PASS user::lock hostile bad\name
+  PASS user::locked hostile bad\name
   PASS user::exists hostile bad\name
   PASS user::id hostile bad\name
   PASS user::group hostile bad\name
   PASS user::home hostile bad\name
   PASS user::shell hostile bad\name
   PASS user::groups hostile bad\name
+  PASS group::valid hostile bad\name
+  PASS group::lock hostile bad\name
+  PASS group::locked hostile bad\name
   PASS group::exists hostile bad\name
   PASS group::id hostile bad\name
   PASS group::users hostile bad\name
+  PASS user::valid hostile $USER
+  PASS user::lock hostile $USER
+  PASS user::locked hostile $USER
   PASS user::exists hostile $USER
   PASS user::id hostile $USER
   PASS user::group hostile $USER
   PASS user::home hostile $USER
   PASS user::shell hostile $USER
   PASS user::groups hostile $USER
+  PASS group::valid hostile $USER
+  PASS group::lock hostile $USER
+  PASS group::locked hostile $USER
   PASS group::exists hostile $USER
   PASS group::id hostile $USER
   PASS group::users hostile $USER
+  PASS user::valid hostile $(id)
+  PASS user::lock hostile $(id)
+  PASS user::locked hostile $(id)
   PASS user::exists hostile $(id)
   PASS user::id hostile $(id)
   PASS user::group hostile $(id)
   PASS user::home hostile $(id)
   PASS user::shell hostile $(id)
   PASS user::groups hostile $(id)
+  PASS group::valid hostile $(id)
+  PASS group::lock hostile $(id)
+  PASS group::locked hostile $(id)
   PASS group::exists hostile $(id)
   PASS group::id hostile $(id)
   PASS group::users hostile $(id)
+  PASS user::valid hostile ;true
+  PASS user::lock hostile ;true
+  PASS user::locked hostile ;true
   PASS user::exists hostile ;true
   PASS user::id hostile ;true
   PASS user::group hostile ;true
   PASS user::home hostile ;true
   PASS user::shell hostile ;true
   PASS user::groups hostile ;true
+  PASS group::valid hostile ;true
+  PASS group::lock hostile ;true
+  PASS group::locked hostile ;true
   PASS group::exists hostile ;true
   PASS group::id hostile ;true
   PASS group::users hostile ;true
+  PASS user::valid hostile x
+y
+  PASS user::lock hostile x
+y
+  PASS user::locked hostile x
+y
   PASS user::exists hostile x
 y
   PASS user::id hostile x
@@ -419,6 +537,12 @@ y
   PASS user::shell hostile x
 y
   PASS user::groups hostile x
+y
+  PASS group::valid hostile x
+y
+  PASS group::lock hostile x
+y
+  PASS group::locked hostile x
 y
   PASS group::exists hostile x
 y
@@ -426,6 +550,12 @@ y
 y
   PASS group::users hostile x
 y
+  PASS user::valid hostile x
+y
+  PASS user::lock hostile x
+y
+  PASS user::locked hostile x
+y
   PASS user::exists hostile x
 y
   PASS user::id hostile x
@@ -437,6 +567,12 @@ y
   PASS user::shell hostile x
 y
   PASS user::groups hostile x
+y
+  PASS group::valid hostile x
+y
+  PASS group::lock hostile x
+y
+  PASS group::locked hostile x
 y
   PASS group::exists hostile x
 y
@@ -445,7 +581,7 @@ y
   PASS group::users hostile x
 y
 
-[0019] read stress
+[0021] read stress
   PASS stress user::name 1
   PASS stress user::id 1
   PASS stress user::group 1
@@ -657,7 +793,44 @@ y
   PASS stress user::all 30
   PASS stress group::all 30
 
-[0020] final cleanup assertion
+[0022] minimal PATH graceful failure
+  PASS minimal PATH user fake fails cleanly
+  PASS minimal PATH group fake fails cleanly
+
+[0023] api coverage gate
+  PASS documented coverage count
+  PASS covered: user::valid
+  PASS covered: user::lock
+  PASS covered: user::locked
+  PASS covered: user::id
+  PASS covered: user::name
+  PASS covered: user::exists
+  PASS covered: user::add
+  PASS covered: user::del
+  PASS covered: user::all
+  PASS covered: user::groups
+  PASS covered: user::add_group
+  PASS covered: user::del_group
+  PASS covered: user::group
+  PASS covered: user::home
+  PASS covered: user::shell
+  PASS covered: user::is_root
+  PASS covered: user::is_admin
+  PASS covered: user::can_sudo
+  PASS covered: group::valid
+  PASS covered: group::lock
+  PASS covered: group::locked
+  PASS covered: group::id
+  PASS covered: group::name
+  PASS covered: group::exists
+  PASS covered: group::add
+  PASS covered: group::del
+  PASS covered: group::all
+  PASS covered: group::users
+  PASS covered: group::add_user
+  PASS covered: group::del_user
+
+[0024] final cleanup assertion
   PASS final user A absent
   PASS final user B absent
   PASS final user C absent
@@ -668,20 +841,17 @@ y
 ============================================================
  user.sh legendary production test summary
 ============================================================
-Total sections : 20
-Pass           : 584
+Total sections : 24
+Pass           : 734
 Fail           : 0
 Skip           : 0
-Root           : /tmp/bashx-user-legendary.CEKwP0
-Prefix         : bx78687439
+Root           : /tmp/bashx-user-legendary.JfRjYk
+Prefix         : bx29447761
 ============================================================
 
 [[ CI MACOS ]]
 
-59s
 Run bash src/parts/builtin/test.sh
-✔︎ JSON API formula_tap_migrations.jws.json
-✔︎ JSON API cask_tap_migrations.jws.json
 ==> Fetching downloads for: bash
 ✔︎ Bottle Manifest bash (5.3.9)
 ✔︎ Bottle Manifest ncurses (6.6)
@@ -703,6 +873,8 @@ DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/
 
 [0001] api presence
   PASS function exists: user::valid
+  PASS function exists: user::lock
+  PASS function exists: user::locked
   PASS function exists: user::id
   PASS function exists: user::name
   PASS function exists: user::exists
@@ -719,6 +891,8 @@ DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/
   PASS function exists: user::is_admin
   PASS function exists: user::can_sudo
   PASS function exists: group::valid
+  PASS function exists: group::lock
+  PASS function exists: group::locked
   PASS function exists: group::id
   PASS function exists: group::name
   PASS function exists: group::exists
@@ -728,42 +902,101 @@ DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/
   PASS function exists: group::users
   PASS function exists: group::add_user
   PASS function exists: group::del_user
+  PASS api count is 30
 
 [0002] validation API
   PASS user::valid accepts root
   PASS group::valid accepts root
   PASS user::valid accepts wheel
   PASS group::valid accepts wheel
-  PASS user::valid accepts bx26506796ua
-  PASS group::valid accepts bx26506796ua
-  PASS user::valid accepts bx26506796ga
-  PASS group::valid accepts bx26506796ga
+  PASS user::valid accepts bx47657886ua
+  PASS group::valid accepts bx47657886ua
+  PASS user::valid accepts bx47657886ga
+  PASS group::valid accepts bx47657886ga
   PASS user::valid accepts abc_123
   PASS group::valid accepts abc_123
   PASS user::valid accepts abc-123
   PASS group::valid accepts abc-123
-  PASS user::valid rejects hostile []
-  PASS group::valid rejects hostile []
-  PASS user::valid rejects hostile [*]
-  PASS group::valid rejects hostile [*]
-  PASS user::valid rejects hostile [?]
-  PASS group::valid rejects hostile [?]
-  PASS user::valid rejects hostile [[abc]]
-  PASS group::valid rejects hostile [[abc]]
-  PASS user::valid rejects hostile [bad/name]
-  PASS group::valid rejects hostile [bad/name]
-  PASS user::valid rejects hostile [bad\name]
-  PASS group::valid rejects hostile [bad\name]
-  PASS user::valid rejects hostile [bad
+  PASS user::valid accepts extended safe __lock_key
+  PASS group::valid accepts extended safe __lock_key
+  PASS user::valid accepts extended safe abc.def
+  PASS group::valid accepts extended safe abc.def
+  PASS user::valid accepts extended safe abc+def
+  PASS group::valid accepts extended safe abc+def
+  PASS user::valid accepts extended safe abc@def
+  PASS group::valid accepts extended safe abc@def
+  PASS user::valid accepts extended safe abc:def
+  PASS group::valid accepts extended safe abc:def
+  PASS user::valid accepts extended safe abc,def
+  PASS group::valid accepts extended safe abc,def
+  PASS user::valid accepts extended safe abc=def
+  PASS group::valid accepts extended safe abc=def
+  PASS user::valid rejects extended hostile [bad/path]
+  PASS group::valid rejects extended hostile [bad/path]
+  PASS user::valid rejects extended hostile [bad\path]
+  PASS group::valid rejects extended hostile [bad\path]
+  PASS user::valid rejects extended hostile [*]
+  PASS group::valid rejects extended hostile [*]
+  PASS user::valid rejects extended hostile [?]
+  PASS group::valid rejects extended hostile [?]
+  PASS user::valid rejects extended hostile [[abc]]
+  PASS group::valid rejects extended hostile [[abc]]
+  PASS user::valid rejects extended hostile [bad]]
+  PASS group::valid rejects extended hostile [bad]]
+  PASS user::valid rejects extended hostile [bad
 name]
-  PASS group::valid rejects hostile [bad
+  PASS group::valid rejects extended hostile [bad
 name]
-  PASS user::valid rejects hostile [bad
+  PASS user::valid rejects extended hostile [bad
 name]
-  PASS group::valid rejects hostile [bad
+  PASS group::valid rejects extended hostile [bad
 name]
 
-[0003] current identity reads
+[0003] lock API standalone
+  PASS user::lock function mode
+  PASS user::lock function mode output
+  PASS user::lock function failure preserves rc
+  PASS user::lock rejects invalid key empty
+  PASS user::lock rejects invalid key wildcard
+  PASS user::lock rejects missing runner
+  PASS user::lock rejects unknown function
+  PASS group::lock function mode
+  PASS group::lock function mode output
+  PASS group::lock function failure preserves rc
+  PASS group::lock rejects invalid key empty
+  PASS group::lock rejects invalid key wildcard
+  PASS group::lock rejects missing runner
+  PASS group::lock rejects unknown function
+  PASS user::lock bash -c code mode
+  PASS user::lock bash -c code output
+  PASS group::lock bash -c code mode
+  PASS group::lock bash -c code output
+  PASS user::lock heredoc code mode
+  PASS user::lock heredoc output
+  PASS group::lock heredoc code mode
+  PASS group::lock heredoc output
+  PASS user::lock clears stale lock
+  PASS user::lock stale output
+  PASS group::lock clears stale lock
+  PASS group::lock stale output
+
+[0004] locked API standalone
+  PASS user::locked absent lock fails
+  PASS group::locked absent lock fails
+  PASS user::locked rejects invalid empty
+  PASS user::locked rejects invalid wildcard
+  PASS group::locked rejects invalid empty
+  PASS group::locked rejects invalid wildcard
+  PASS user::locked active pid
+  PASS group::locked active pid
+  PASS user::locked pidless conservative locked
+  PASS group::locked pidless conservative locked
+  PASS user::locked stale pid fails
+  PASS group::locked stale pid fails
+  PASS user::locked stale dir removed
+  PASS group::locked stale dir removed
+
+[0005] current identity reads
   PASS user::name nonempty
   PASS user::id nonempty
   PASS user::id numeric
@@ -776,7 +1009,7 @@ name]
   PASS user::name no CR/LF
   PASS group::name no CR/LF
 
-[0004] identity repeatability
+[0006] identity repeatability
   PASS repeat user::name 1
   PASS repeat user::id 1
   PASS repeat user::group 1
@@ -826,7 +1059,7 @@ name]
   PASS repeat user::group 12
   PASS repeat group::id 12
 
-[0005] user::exists matrix
+[0007] user::exists matrix
   PASS current user exists
   PASS current user in current group
   PASS fake user missing
@@ -850,7 +1083,7 @@ group]
   PASS user::exists rejects bad group [bad
 group]
 
-[0006] group::exists matrix
+[0008] group::exists matrix
   PASS current group exists
   PASS fake group missing
   PASS group::exists rejects bad group []
@@ -863,7 +1096,7 @@ group]
   PASS group::exists rejects bad group [bad
 group]
 
-[0007] id matrices
+[0009] id matrices
   PASS implicit id equals explicit current
   PASS fake user id fails
   PASS implicit group id equals explicit current
@@ -885,7 +1118,7 @@ x]
   PASS group::id rejects bad [bad
 x]
 
-[0008] list all users/groups
+[0010] list all users/groups
   PASS user::all nonempty
   PASS group::all nonempty
   PASS user::all contains current user
@@ -895,7 +1128,7 @@ x]
   PASS user::all unique
   PASS group::all unique
 
-[0009] membership listing wrappers
+[0011] membership listing wrappers
   PASS user::groups current nonempty
   PASS group::users current nonempty
   PASS user::groups contains current group
@@ -907,7 +1140,7 @@ x]
   PASS user::groups rejects wildcard
   PASS group::users rejects wildcard
 
-[0010] home and shell reads
+[0012] home and shell reads
   PASS implicit home nonempty
   PASS explicit home nonempty
   PASS implicit explicit home stable
@@ -917,7 +1150,7 @@ x]
   PASS fake user home fails
   PASS fake user shell fails
 
-[0011] privilege checks
+[0013] privilege checks
   PASS user::is_root true branch
   PASS user::is_admin true branch
   PASS user::can_sudo true branch
@@ -926,14 +1159,14 @@ x]
   PASS can_sudo fake user fails
   PASS non-windows can_sudo callable
 
-[0012] pre-mutation clean state
+[0014] pre-mutation clean state
   PASS user A absent
   PASS user B absent
   PASS group A absent
   PASS group B absent
   PASS group C absent
 
-[0013] group lifecycle destructive
+[0015] group lifecycle destructive
   PASS group add A
   PASS group exists A
   PASS group add A idempotent
@@ -948,7 +1181,7 @@ x]
   PASS group del invalid empty
   PASS group del invalid wildcard
 
-[0014] user create-only strict lifecycle
+[0016] user create-only strict lifecycle
   PASS group add A
   PASS group add B
   PASS user add A in group A
@@ -974,7 +1207,7 @@ x]
   PASS group del A
   PASS group del B
 
-[0015] membership lifecycle user namespace
+[0017] membership lifecycle user namespace
   PASS group add A
   PASS group add B
   PASS user add A in group A
@@ -996,7 +1229,7 @@ x]
   PASS group del B
   PASS group del C
 
-[0016] membership lifecycle group namespace strict
+[0018] membership lifecycle group namespace strict
   PASS group add A
   PASS group add C
   PASS user add B in group A
@@ -1016,7 +1249,7 @@ x]
   PASS group del A
   PASS group del C
 
-[0017] delete safety and idempotency
+[0019] delete safety and idempotency
   PASS user::del empty rejects
   PASS user::del wildcard rejects
   PASS user::del newline rejects
@@ -1027,79 +1260,133 @@ x]
   PASS group::del newline rejects
   PASS group::del valid missing idempotent
 
-[0018] hostile input sweep
+[0020] hostile input sweep
+  PASS user::valid hostile *
+  PASS user::lock hostile *
+  PASS user::locked hostile *
   PASS user::exists hostile *
   PASS user::id hostile *
   PASS user::group hostile *
   PASS user::home hostile *
   PASS user::shell hostile *
   PASS user::groups hostile *
+  PASS group::valid hostile *
+  PASS group::lock hostile *
+  PASS group::locked hostile *
   PASS group::exists hostile *
   PASS group::id hostile *
   PASS group::users hostile *
+  PASS user::valid hostile ?
+  PASS user::lock hostile ?
+  PASS user::locked hostile ?
   PASS user::exists hostile ?
   PASS user::id hostile ?
   PASS user::group hostile ?
   PASS user::home hostile ?
   PASS user::shell hostile ?
   PASS user::groups hostile ?
+  PASS group::valid hostile ?
+  PASS group::lock hostile ?
+  PASS group::locked hostile ?
   PASS group::exists hostile ?
   PASS group::id hostile ?
   PASS group::users hostile ?
+  PASS user::valid hostile [abc]
+  PASS user::lock hostile [abc]
+  PASS user::locked hostile [abc]
   PASS user::exists hostile [abc]
   PASS user::id hostile [abc]
   PASS user::group hostile [abc]
   PASS user::home hostile [abc]
   PASS user::shell hostile [abc]
   PASS user::groups hostile [abc]
+  PASS group::valid hostile [abc]
+  PASS group::lock hostile [abc]
+  PASS group::locked hostile [abc]
   PASS group::exists hostile [abc]
   PASS group::id hostile [abc]
   PASS group::users hostile [abc]
+  PASS user::valid hostile bad/name
+  PASS user::lock hostile bad/name
+  PASS user::locked hostile bad/name
   PASS user::exists hostile bad/name
   PASS user::id hostile bad/name
   PASS user::group hostile bad/name
   PASS user::home hostile bad/name
   PASS user::shell hostile bad/name
   PASS user::groups hostile bad/name
+  PASS group::valid hostile bad/name
+  PASS group::lock hostile bad/name
+  PASS group::locked hostile bad/name
   PASS group::exists hostile bad/name
   PASS group::id hostile bad/name
   PASS group::users hostile bad/name
+  PASS user::valid hostile bad\name
+  PASS user::lock hostile bad\name
+  PASS user::locked hostile bad\name
   PASS user::exists hostile bad\name
   PASS user::id hostile bad\name
   PASS user::group hostile bad\name
   PASS user::home hostile bad\name
   PASS user::shell hostile bad\name
   PASS user::groups hostile bad\name
+  PASS group::valid hostile bad\name
+  PASS group::lock hostile bad\name
+  PASS group::locked hostile bad\name
   PASS group::exists hostile bad\name
   PASS group::id hostile bad\name
   PASS group::users hostile bad\name
+  PASS user::valid hostile $USER
+  PASS user::lock hostile $USER
+  PASS user::locked hostile $USER
   PASS user::exists hostile $USER
   PASS user::id hostile $USER
   PASS user::group hostile $USER
   PASS user::home hostile $USER
   PASS user::shell hostile $USER
   PASS user::groups hostile $USER
+  PASS group::valid hostile $USER
+  PASS group::lock hostile $USER
+  PASS group::locked hostile $USER
   PASS group::exists hostile $USER
   PASS group::id hostile $USER
   PASS group::users hostile $USER
+  PASS user::valid hostile $(id)
+  PASS user::lock hostile $(id)
+  PASS user::locked hostile $(id)
   PASS user::exists hostile $(id)
   PASS user::id hostile $(id)
   PASS user::group hostile $(id)
   PASS user::home hostile $(id)
   PASS user::shell hostile $(id)
   PASS user::groups hostile $(id)
+  PASS group::valid hostile $(id)
+  PASS group::lock hostile $(id)
+  PASS group::locked hostile $(id)
   PASS group::exists hostile $(id)
   PASS group::id hostile $(id)
   PASS group::users hostile $(id)
+  PASS user::valid hostile ;true
+  PASS user::lock hostile ;true
+  PASS user::locked hostile ;true
   PASS user::exists hostile ;true
   PASS user::id hostile ;true
   PASS user::group hostile ;true
   PASS user::home hostile ;true
   PASS user::shell hostile ;true
   PASS user::groups hostile ;true
+  PASS group::valid hostile ;true
+  PASS group::lock hostile ;true
+  PASS group::locked hostile ;true
   PASS group::exists hostile ;true
   PASS group::id hostile ;true
   PASS group::users hostile ;true
+  PASS user::valid hostile x
+y
+  PASS user::lock hostile x
+y
+  PASS user::locked hostile x
+y
   PASS user::exists hostile x
 y
   PASS user::id hostile x
@@ -1111,6 +1398,12 @@ y
   PASS user::shell hostile x
 y
   PASS user::groups hostile x
+y
+  PASS group::valid hostile x
+y
+  PASS group::lock hostile x
+y
+  PASS group::locked hostile x
 y
   PASS group::exists hostile x
 y
@@ -1118,6 +1411,12 @@ y
 y
   PASS group::users hostile x
 y
+  PASS user::valid hostile x
+y
+  PASS user::lock hostile x
+y
+  PASS user::locked hostile x
+y
   PASS user::exists hostile x
 y
   PASS user::id hostile x
@@ -1129,6 +1428,12 @@ y
   PASS user::shell hostile x
 y
   PASS user::groups hostile x
+y
+  PASS group::valid hostile x
+y
+  PASS group::lock hostile x
+y
+  PASS group::locked hostile x
 y
   PASS group::exists hostile x
 y
@@ -1137,7 +1442,7 @@ y
   PASS group::users hostile x
 y
 
-[0019] read stress
+[0021] read stress
   PASS stress user::name 1
   PASS stress user::id 1
   PASS stress user::group 1
@@ -1349,7 +1654,44 @@ y
   PASS stress user::all 30
   PASS stress group::all 30
 
-[0020] final cleanup assertion
+[0022] minimal PATH graceful failure
+  PASS minimal PATH user fake fails cleanly
+  PASS minimal PATH group fake fails cleanly
+
+[0023] api coverage gate
+  PASS documented coverage count
+  PASS covered: user::valid
+  PASS covered: user::lock
+  PASS covered: user::locked
+  PASS covered: user::id
+  PASS covered: user::name
+  PASS covered: user::exists
+  PASS covered: user::add
+  PASS covered: user::del
+  PASS covered: user::all
+  PASS covered: user::groups
+  PASS covered: user::add_group
+  PASS covered: user::del_group
+  PASS covered: user::group
+  PASS covered: user::home
+  PASS covered: user::shell
+  PASS covered: user::is_root
+  PASS covered: user::is_admin
+  PASS covered: user::can_sudo
+  PASS covered: group::valid
+  PASS covered: group::lock
+  PASS covered: group::locked
+  PASS covered: group::id
+  PASS covered: group::name
+  PASS covered: group::exists
+  PASS covered: group::add
+  PASS covered: group::del
+  PASS covered: group::all
+  PASS covered: group::users
+  PASS covered: group::add_user
+  PASS covered: group::del_user
+
+[0024] final cleanup assertion
   PASS final user A absent
   PASS final user B absent
   PASS final user C absent
@@ -1360,23 +1702,23 @@ y
 ============================================================
  user.sh legendary production test summary
 ============================================================
-Total sections : 20
-Pass           : 584
+Total sections : 24
+Pass           : 734
 Fail           : 0
 Skip           : 0
-Root           : /tmp/bashx-user-legendary.Y37HwO
-Prefix         : bx26506796
+Root           : /tmp/bashx-user-legendary.S8ayzQ
+Prefix         : bx47657886
 ============================================================
 
 [[ CI WINDOWS ]]
 
-3m 51s
 Run bash src/parts/builtin/test.sh
 [target] user.sh
 [env] os=windows runtime=gitbash user=runneradmin group=Administrators mutate=1
-
 [0001] api presence
   PASS function exists: user::valid
+  PASS function exists: user::lock
+  PASS function exists: user::locked
   PASS function exists: user::id
   PASS function exists: user::name
   PASS function exists: user::exists
@@ -1393,6 +1735,8 @@ Run bash src/parts/builtin/test.sh
   PASS function exists: user::is_admin
   PASS function exists: user::can_sudo
   PASS function exists: group::valid
+  PASS function exists: group::lock
+  PASS function exists: group::locked
   PASS function exists: group::id
   PASS function exists: group::name
   PASS function exists: group::exists
@@ -1402,42 +1746,97 @@ Run bash src/parts/builtin/test.sh
   PASS function exists: group::users
   PASS function exists: group::add_user
   PASS function exists: group::del_user
-
+  PASS api count is 30
 [0002] validation API
   PASS user::valid accepts runneradmin
   PASS group::valid accepts runneradmin
   PASS user::valid accepts Administrators
   PASS group::valid accepts Administrators
-  PASS user::valid accepts bx97367526ua
-  PASS group::valid accepts bx97367526ua
-  PASS user::valid accepts bx97367526ga
-  PASS group::valid accepts bx97367526ga
+  PASS user::valid accepts bx69791147ua
+  PASS group::valid accepts bx69791147ua
+  PASS user::valid accepts bx69791147ga
+  PASS group::valid accepts bx69791147ga
   PASS user::valid accepts abc_123
   PASS group::valid accepts abc_123
   PASS user::valid accepts abc-123
   PASS group::valid accepts abc-123
-  PASS user::valid rejects hostile []
-  PASS group::valid rejects hostile []
-  PASS user::valid rejects hostile [*]
-  PASS group::valid rejects hostile [*]
-  PASS user::valid rejects hostile [?]
-  PASS group::valid rejects hostile [?]
-  PASS user::valid rejects hostile [[abc]]
-  PASS group::valid rejects hostile [[abc]]
-  PASS user::valid rejects hostile [bad/name]
-  PASS group::valid rejects hostile [bad/name]
-  PASS user::valid rejects hostile [bad\name]
-  PASS group::valid rejects hostile [bad\name]
-  PASS user::valid rejects hostile [bad
+  PASS user::valid accepts extended safe __lock_key
+  PASS group::valid accepts extended safe __lock_key
+  PASS user::valid accepts extended safe abc.def
+  PASS group::valid accepts extended safe abc.def
+  PASS user::valid accepts extended safe abc+def
+  PASS group::valid accepts extended safe abc+def
+  PASS user::valid accepts extended safe abc@def
+  PASS group::valid accepts extended safe abc@def
+  PASS user::valid accepts extended safe abc:def
+  PASS group::valid accepts extended safe abc:def
+  PASS user::valid accepts extended safe abc,def
+  PASS group::valid accepts extended safe abc,def
+  PASS user::valid accepts extended safe abc=def
+  PASS group::valid accepts extended safe abc=def
+  PASS user::valid rejects extended hostile [bad/path]
+  PASS group::valid rejects extended hostile [bad/path]
+  PASS user::valid rejects extended hostile [bad\path]
+  PASS group::valid rejects extended hostile [bad\path]
+  PASS user::valid rejects extended hostile [*]
+  PASS group::valid rejects extended hostile [*]
+  PASS user::valid rejects extended hostile [?]
+  PASS group::valid rejects extended hostile [?]
+  PASS user::valid rejects extended hostile [[abc]]
+  PASS group::valid rejects extended hostile [[abc]]
+  PASS user::valid rejects extended hostile [bad]]
+  PASS group::valid rejects extended hostile [bad]]
+  PASS user::valid rejects extended hostile [bad
 name]
-  PASS group::valid rejects hostile [bad
+  PASS group::valid rejects extended hostile [bad
 name]
-  PASS user::valid rejects hostile [bad
+  PASS user::valid rejects extended hostile [bad
 name]
-  PASS group::valid rejects hostile [bad
+  PASS group::valid rejects extended hostile [bad
 name]
-
-[0003] current identity reads
+[0003] lock API standalone
+  PASS user::lock function mode
+  PASS user::lock function mode output
+  PASS user::lock function failure preserves rc
+  PASS user::lock rejects invalid key empty
+  PASS user::lock rejects invalid key wildcard
+  PASS user::lock rejects missing runner
+  PASS user::lock rejects unknown function
+  PASS group::lock function mode
+  PASS group::lock function mode output
+  PASS group::lock function failure preserves rc
+  PASS group::lock rejects invalid key empty
+  PASS group::lock rejects invalid key wildcard
+  PASS group::lock rejects missing runner
+  PASS group::lock rejects unknown function
+  PASS user::lock bash -c code mode
+  PASS user::lock bash -c code output
+  PASS group::lock bash -c code mode
+  PASS group::lock bash -c code output
+  PASS user::lock heredoc code mode
+  PASS user::lock heredoc output
+  PASS group::lock heredoc code mode
+  PASS group::lock heredoc output
+  PASS user::lock clears stale lock
+  PASS user::lock stale output
+  PASS group::lock clears stale lock
+  PASS group::lock stale output
+[0004] locked API standalone
+  PASS user::locked absent lock fails
+  PASS group::locked absent lock fails
+  PASS user::locked rejects invalid empty
+  PASS user::locked rejects invalid wildcard
+  PASS group::locked rejects invalid empty
+  PASS group::locked rejects invalid wildcard
+  PASS user::locked active pid
+  PASS group::locked active pid
+  PASS user::locked pidless conservative locked
+  PASS group::locked pidless conservative locked
+  PASS user::locked stale pid fails
+  PASS group::locked stale pid fails
+  PASS user::locked stale dir removed
+  PASS group::locked stale dir removed
+[0005] current identity reads
   PASS user::name nonempty
   PASS user::id nonempty
   PASS user::id numeric
@@ -1449,8 +1848,7 @@ name]
   PASS user::shell nonempty
   PASS user::name no CR/LF
   PASS group::name no CR/LF
-
-[0004] identity repeatability
+[0006] identity repeatability
   PASS repeat user::name 1
   PASS repeat user::id 1
   PASS repeat user::group 1
@@ -1499,8 +1897,7 @@ name]
   PASS repeat user::id 12
   PASS repeat user::group 12
   PASS repeat group::id 12
-
-[0005] user::exists matrix
+[0007] user::exists matrix
   PASS current user exists
   PASS current user in current group
   PASS fake user missing
@@ -1523,8 +1920,7 @@ name]
 group]
   PASS user::exists rejects bad group [bad
 group]
-
-[0006] group::exists matrix
+[0008] group::exists matrix
   PASS current group exists
   PASS fake group missing
   PASS group::exists rejects bad group []
@@ -1536,8 +1932,7 @@ group]
 group]
   PASS group::exists rejects bad group [bad
 group]
-
-[0007] id matrices
+[0009] id matrices
   PASS implicit id equals explicit current
   PASS fake user id fails
   PASS implicit group id equals explicit current
@@ -1558,8 +1953,7 @@ x]
 x]
   PASS group::id rejects bad [bad
 x]
-
-[0008] list all users/groups
+[0010] list all users/groups
   PASS user::all nonempty
   PASS group::all nonempty
   PASS user::all contains current user
@@ -1568,8 +1962,7 @@ x]
   PASS group::all excludes fake group
   PASS user::all unique
   PASS group::all unique
-
-[0009] membership listing wrappers
+[0011] membership listing wrappers
   PASS user::groups current nonempty
   PASS group::users current nonempty
   PASS user::groups contains current group
@@ -1580,8 +1973,7 @@ x]
   PASS group::users fake group fails
   PASS user::groups rejects wildcard
   PASS group::users rejects wildcard
-
-[0010] home and shell reads
+[0012] home and shell reads
   PASS implicit home nonempty
   PASS explicit home nonempty
   PASS implicit explicit home stable
@@ -1590,8 +1982,7 @@ x]
   PASS implicit explicit shell stable
   PASS fake user home fails
   PASS fake user shell fails
-
-[0011] privilege checks
+[0013] privilege checks
   PASS user::is_root true branch
   PASS user::is_admin true branch
   PASS user::can_sudo false branch
@@ -1599,15 +1990,13 @@ x]
   PASS is_admin fake user fails
   PASS can_sudo fake user fails
   PASS windows can_sudo false
-
-[0012] pre-mutation clean state
+[0014] pre-mutation clean state
   PASS user A absent
   PASS user B absent
   PASS group A absent
   PASS group B absent
   PASS group C absent
-
-[0013] group lifecycle destructive
+[0015] group lifecycle destructive
   PASS group add A
   PASS group exists A
   PASS group add A idempotent
@@ -1621,8 +2010,7 @@ x]
   PASS group del A idempotent
   PASS group del invalid empty
   PASS group del invalid wildcard
-
-[0014] user create-only strict lifecycle
+[0016] user create-only strict lifecycle
   PASS group add A
   PASS group add B
   PASS user add A in group A
@@ -1647,8 +2035,7 @@ x]
   PASS user del A idempotent
   PASS group del A
   PASS group del B
-
-[0015] membership lifecycle user namespace
+[0017] membership lifecycle user namespace
   PASS group add A
   PASS group add B
   PASS user add A in group A
@@ -1669,8 +2056,7 @@ x]
   PASS group del A
   PASS group del B
   PASS group del C
-
-[0016] membership lifecycle group namespace strict
+[0018] membership lifecycle group namespace strict
   PASS group add A
   PASS group add C
   PASS user add B in group A
@@ -1689,8 +2075,7 @@ x]
   PASS user del B
   PASS group del A
   PASS group del C
-
-[0017] delete safety and idempotency
+[0019] delete safety and idempotency
   PASS user::del empty rejects
   PASS user::del wildcard rejects
   PASS user::del newline rejects
@@ -1700,97 +2085,132 @@ x]
   PASS group::del wildcard rejects
   PASS group::del newline rejects
   PASS group::del valid missing idempotent
-
-[0018] hostile input sweep
+[0020] hostile input sweep
+  PASS user::valid hostile *
+  PASS user::lock hostile *
+  PASS user::locked hostile *
   PASS user::exists hostile *
   PASS user::id hostile *
   PASS user::group hostile *
   PASS user::home hostile *
   PASS user::shell hostile *
   PASS user::groups hostile *
+  PASS group::valid hostile *
+  PASS group::lock hostile *
+  PASS group::locked hostile *
   PASS group::exists hostile *
   PASS group::id hostile *
   PASS group::users hostile *
+  PASS user::valid hostile ?
+  PASS user::lock hostile ?
+  PASS user::locked hostile ?
   PASS user::exists hostile ?
   PASS user::id hostile ?
   PASS user::group hostile ?
   PASS user::home hostile ?
   PASS user::shell hostile ?
   PASS user::groups hostile ?
+  PASS group::valid hostile ?
+  PASS group::lock hostile ?
+  PASS group::locked hostile ?
   PASS group::exists hostile ?
   PASS group::id hostile ?
   PASS group::users hostile ?
+  PASS user::valid hostile [abc]
+  PASS user::lock hostile [abc]
+  PASS user::locked hostile [abc]
   PASS user::exists hostile [abc]
   PASS user::id hostile [abc]
   PASS user::group hostile [abc]
   PASS user::home hostile [abc]
   PASS user::shell hostile [abc]
   PASS user::groups hostile [abc]
+  PASS group::valid hostile [abc]
+  PASS group::lock hostile [abc]
+  PASS group::locked hostile [abc]
   PASS group::exists hostile [abc]
   PASS group::id hostile [abc]
   PASS group::users hostile [abc]
+  PASS user::valid hostile bad/name
+  PASS user::lock hostile bad/name
+  PASS user::locked hostile bad/name
   PASS user::exists hostile bad/name
   PASS user::id hostile bad/name
   PASS user::group hostile bad/name
   PASS user::home hostile bad/name
   PASS user::shell hostile bad/name
   PASS user::groups hostile bad/name
+  PASS group::valid hostile bad/name
+  PASS group::lock hostile bad/name
+  PASS group::locked hostile bad/name
   PASS group::exists hostile bad/name
   PASS group::id hostile bad/name
   PASS group::users hostile bad/name
+  PASS user::valid hostile bad\name
+  PASS user::lock hostile bad\name
+  PASS user::locked hostile bad\name
   PASS user::exists hostile bad\name
   PASS user::id hostile bad\name
   PASS user::group hostile bad\name
   PASS user::home hostile bad\name
   PASS user::shell hostile bad\name
   PASS user::groups hostile bad\name
+  PASS group::valid hostile bad\name
+  PASS group::lock hostile bad\name
+  PASS group::locked hostile bad\name
   PASS group::exists hostile bad\name
   PASS group::id hostile bad\name
   PASS group::users hostile bad\name
+  PASS user::valid hostile $USER
+  PASS user::lock hostile $USER
+  PASS user::locked hostile $USER
   PASS user::exists hostile $USER
   PASS user::id hostile $USER
   PASS user::group hostile $USER
   PASS user::home hostile $USER
   PASS user::shell hostile $USER
   PASS user::groups hostile $USER
+  PASS group::valid hostile $USER
+  PASS group::lock hostile $USER
+  PASS group::locked hostile $USER
   PASS group::exists hostile $USER
   PASS group::id hostile $USER
   PASS group::users hostile $USER
+  PASS user::valid hostile $(id)
+  PASS user::lock hostile $(id)
+  PASS user::locked hostile $(id)
   PASS user::exists hostile $(id)
   PASS user::id hostile $(id)
   PASS user::group hostile $(id)
   PASS user::home hostile $(id)
   PASS user::shell hostile $(id)
   PASS user::groups hostile $(id)
+  PASS group::valid hostile $(id)
+  PASS group::lock hostile $(id)
+  PASS group::locked hostile $(id)
   PASS group::exists hostile $(id)
   PASS group::id hostile $(id)
   PASS group::users hostile $(id)
+  PASS user::valid hostile ;true
+  PASS user::lock hostile ;true
+  PASS user::locked hostile ;true
   PASS user::exists hostile ;true
   PASS user::id hostile ;true
   PASS user::group hostile ;true
   PASS user::home hostile ;true
   PASS user::shell hostile ;true
   PASS user::groups hostile ;true
+  PASS group::valid hostile ;true
+  PASS group::lock hostile ;true
+  PASS group::locked hostile ;true
   PASS group::exists hostile ;true
   PASS group::id hostile ;true
   PASS group::users hostile ;true
-  PASS user::exists hostile x
+  PASS user::valid hostile x
 y
-  PASS user::id hostile x
+  PASS user::lock hostile x
 y
-  PASS user::group hostile x
-y
-  PASS user::home hostile x
-y
-  PASS user::shell hostile x
-y
-  PASS user::groups hostile x
-y
-  PASS group::exists hostile x
-y
-  PASS group::id hostile x
-y
-  PASS group::users hostile x
+  PASS user::locked hostile x
 y
   PASS user::exists hostile x
 y
@@ -1804,14 +2224,49 @@ y
 y
   PASS user::groups hostile x
 y
+  PASS group::valid hostile x
+y
+  PASS group::lock hostile x
+y
+  PASS group::locked hostile x
+y
   PASS group::exists hostile x
 y
   PASS group::id hostile x
 y
   PASS group::users hostile x
 y
-
-[0019] read stress
+  PASS user::valid hostile x
+y
+  PASS user::lock hostile x
+y
+  PASS user::locked hostile x
+y
+  PASS user::exists hostile x
+y
+  PASS user::id hostile x
+y
+  PASS user::group hostile x
+y
+  PASS user::home hostile x
+y
+  PASS user::shell hostile x
+y
+  PASS user::groups hostile x
+y
+  PASS group::valid hostile x
+y
+  PASS group::lock hostile x
+y
+  PASS group::locked hostile x
+y
+  PASS group::exists hostile x
+y
+  PASS group::id hostile x
+y
+  PASS group::users hostile x
+y
+[0021] read stress
   PASS stress user::name 1
   PASS stress user::id 1
   PASS stress user::group 1
@@ -2022,22 +2477,55 @@ y
   PASS stress user::shell 30
   PASS stress user::all 30
   PASS stress group::all 30
-
-[0020] final cleanup assertion
+[0022] minimal PATH graceful failure
+  PASS minimal PATH user fake fails cleanly
+  PASS minimal PATH group fake fails cleanly
+[0023] api coverage gate
+  PASS documented coverage count
+  PASS covered: user::valid
+  PASS covered: user::lock
+  PASS covered: user::locked
+  PASS covered: user::id
+  PASS covered: user::name
+  PASS covered: user::exists
+  PASS covered: user::add
+  PASS covered: user::del
+  PASS covered: user::all
+  PASS covered: user::groups
+  PASS covered: user::add_group
+  PASS covered: user::del_group
+  PASS covered: user::group
+  PASS covered: user::home
+  PASS covered: user::shell
+  PASS covered: user::is_root
+  PASS covered: user::is_admin
+  PASS covered: user::can_sudo
+  PASS covered: group::valid
+  PASS covered: group::lock
+  PASS covered: group::locked
+  PASS covered: group::id
+  PASS covered: group::name
+  PASS covered: group::exists
+  PASS covered: group::add
+  PASS covered: group::del
+  PASS covered: group::all
+  PASS covered: group::users
+  PASS covered: group::add_user
+  PASS covered: group::del_user
+[0024] final cleanup assertion
   PASS final user A absent
   PASS final user B absent
   PASS final user C absent
   PASS final group A absent
   PASS final group B absent
   PASS final group C absent
-
 ============================================================
  user.sh legendary production test summary
 ============================================================
-Total sections : 20
-Pass           : 584
+Total sections : 24
+Pass           : 734
 Fail           : 0
 Skip           : 0
-Root           : /tmp/bashx-user-legendary.XGOMFu
-Prefix         : bx97367526
+Root           : /tmp/bashx-user-legendary.IAHZoi
+Prefix         : bx69791147
 ============================================================

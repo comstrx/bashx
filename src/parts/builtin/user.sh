@@ -19,7 +19,7 @@ user::lock () {
     user::valid "${name}" || return 1
 
     [[ -n "${run}" ]] || return 1
-    [[ "${run}" != "--" ]] && { declare -F "${run}" >/dev/null 2>&1 || return 1; }
+    [[ "${run}" != "--" && "${run}" != "--stdin" ]] && { declare -F "${run}" >/dev/null 2>&1 || return 1; }
 
     root="${TMPDIR:-/tmp}/bash-permissions-locks"
     lock="${root}/${name}.lock"
@@ -46,16 +46,17 @@ user::lock () {
 
     if [[ "${run}" == "--" ]]; then
 
-        if [[ $# -gt 0 && "${1:-}" == *$'\n'* ]]; then
-            code="${1}"
-            shift
+        code="${1:-}"
+        shift || { rm -rf -- "${lock}" >/dev/null 2>&1 || true; return 1; }
+        [[ -n "${code}" ]] || { rm -rf -- "${lock}" >/dev/null 2>&1 || true; return 1; }
 
-            command bash -c "${code}" _ "$@"
-            rc=$?
-        else
-            command bash -s -- "$@"
-            rc=$?
-        fi
+        command bash -c "${code}" _ "$@"
+        rc=$?
+
+    elif [[ "${run}" == "--stdin" ]]; then
+
+        command bash -s -- "$@"
+        rc=$?
 
     else
 
@@ -1415,7 +1416,6 @@ group::all () {
 
         sys::has dscl || return 1
         dscl . -list /Groups 2>/dev/null | awk 'NF && !seen[$0]++ { print }'
-
         return
 
     fi
