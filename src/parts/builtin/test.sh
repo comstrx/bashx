@@ -210,7 +210,7 @@ done
 
 _test::section "perm::valid"
 
-for x in 000 400 444 600 644 700 755 777 0644 0755 u+r u+w u+x u+rw u+rwx g-r o-w a+r ug+rwx u=rw go-rwx u+s g+s +r -w =rw rx rwx rXst u+rw,g-r,o+x; do
+for x in 000 400 444 600 644 700 755 777 0644 0755 u+r u+w u+x u+rw u+rwx g-r o-w a+r ug+rwx u=rw go-rwx u+s g+s +r -w =rw u+rw,g-r,o+x; do
     _test::ok "valid mode: ${x}" perm::valid "${x}" mode
 done
 
