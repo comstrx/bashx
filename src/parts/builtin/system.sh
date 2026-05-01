@@ -584,7 +584,6 @@ sys::distro () {
     return 1
 
 }
-
 sys::arch () {
 
     local v="" lower=""
@@ -703,6 +702,7 @@ sys::loadavg () {
     return 1
 
 }
+
 sys::umask () {
 
     local v=""
@@ -711,28 +711,6 @@ sys::umask () {
     [[ -n "${v}" ]] || return 1
 
     printf '%s\n' "${v}"
-
-}
-
-sys::shell () {
-
-    local v=""
-    v="${BASH:-}"
-
-    [[ -n "${v}" ]] || v="${0:-}"
-    [[ -n "${v}" ]] || return 1
-
-    printf '%s\n' "${v}"
-
-}
-sys::pid () {
-
-    printf '%s\n' "$$"
-
-}
-sys::ppid () {
-
-    printf '%s\n' "${PPID:-0}"
 
 }
 sys::proxy () {
@@ -745,6 +723,16 @@ sys::proxy () {
     done
 
     return 0
+
+}
+sys::pid () {
+
+    printf '%s\n' "$$"
+
+}
+sys::ppid () {
+
+    printf '%s\n' "${PPID:-0}"
 
 }
 sys::ip () {
@@ -872,43 +860,6 @@ sys::username () {
 
 }
 
-sys::path_name () {
-
-    if sys::is_windows; then printf '%s\n' "Path"
-    else printf '%s\n' "PATH"
-    fi
-
-}
-sys::path_sep () {
-
-    if sys::is_windows; then printf '%s\n' ";"
-    else printf '%s\n' ":"
-    fi
-
-}
-sys::line_sep () {
-
-    if sys::is_windows; then printf '%s\n' "crlf"
-    else printf '%s\n' "lf"
-    fi
-
-}
-sys::exe_suffix () {
-
-    if sys::is_windows; then printf '%s\n' ".exe"
-    else printf '%s\n' ""
-    fi
-
-}
-sys::lib_suffix () {
-
-    if sys::is_windows; then printf '%s\n' ".dll"
-    elif sys::is_macos; then printf '%s\n' ".dylib"
-    else printf '%s\n' ".so"
-    fi
-
-}
-
 sys::which () {
 
     local bin="${1:-}" v=""
@@ -966,6 +917,42 @@ sys::which_all () {
     done
 
     return "${found}"
+
+}
+sys::path_name () {
+
+    if sys::is_windows; then printf '%s\n' "Path"
+    else printf '%s\n' "PATH"
+    fi
+
+}
+sys::path_sep () {
+
+    if sys::is_windows; then printf '%s\n' ";"
+    else printf '%s\n' ":"
+    fi
+
+}
+sys::line_sep () {
+
+    if sys::is_windows; then printf '%s\n' "crlf"
+    else printf '%s\n' "lf"
+    fi
+
+}
+sys::exe_suffix () {
+
+    if sys::is_windows; then printf '%s\n' ".exe"
+    else printf '%s\n' ""
+    fi
+
+}
+sys::lib_suffix () {
+
+    if sys::is_windows; then printf '%s\n' ".dll"
+    elif sys::is_macos; then printf '%s\n' ".dylib"
+    else printf '%s\n' ".so"
+    fi
 
 }
 sys::path_dirs () {
@@ -1552,6 +1539,17 @@ sys::cpu_info () {
 
 }
 
+sys::bash () {
+
+    local v=""
+    v="${BASH:-}"
+
+    [[ -n "${v}" ]] || v="${0:-}"
+    [[ -n "${v}" ]] || return 1
+
+    printf '%s\n' "${v}"
+
+}
 sys::bash_version () {
 
     local v="${BASH_VERSION:-}"
@@ -1586,7 +1584,10 @@ sys::bash_msrv () {
 
     IFS=. read -r n1 n2 n3 <<< "${need}"
 
-    c1="${BASH_REMATCH[1]:-0}"; c2="${BASH_REMATCH[3]:-0}"; c3="${BASH_REMATCH[5]:-0}"
+    c1="${BASH_REMATCH[1]:-0}"
+    c2="${BASH_REMATCH[3]:-0}"
+    c3="${BASH_REMATCH[5]:-0}"
+
     n1="${n1:-0}"; n2="${n2:-0}"; n3="${n3:-0}"
     c1="${c1:-0}"; c2="${c2:-0}"; c3="${c3:-0}"
 
@@ -1740,7 +1741,6 @@ sys::ensure_bash () {
     [[ -n "${found}" ]] || exit 1
 
     script="${0:-}"
-
     [[ -z "${script}" || ! -f "${script}" ]] && script="${BASH_SOURCE[0]:-${0:-}}"
     [[ -n "${script}" && -f "${script}" ]] || exit 1
 
