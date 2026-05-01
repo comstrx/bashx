@@ -10,6 +10,62 @@ user::valid () {
     [[ "${v}" != *"\\"* ]] || return 1
 
 }
+user::lock () {
+
+    local name="${1:-}" run="${2:-}" code="" root="" lock="" pid="" old="" i=0 rc=0
+
+    shift 2 || return 1
+    user::valid "${name}" || return 1
+
+    [[ -n "${run}" ]] || return 1
+    [[ "${run}" != "--" ]] && { declare -F "${run}" >/dev/null 2>&1 || return 1; }
+
+    root="${TMPDIR:-/tmp}/bash-permissions-locks"
+    lock="${root}/${name}.lock"
+    pid="${lock}/pid"
+
+    mkdir -p -- "${root}" >/dev/null 2>&1 || return 1
+
+    while ! mkdir -- "${lock}" 2>/dev/null; do
+
+        old=""
+        [[ -r "${pid}" ]] && { IFS= read -r old < "${pid}" || true; }
+
+        if [[ "${old}" =~ ^[0-9]+$ ]] && ! kill -0 "${old}" 2>/dev/null; then
+            rm -rf -- "${lock}" >/dev/null 2>&1 || true
+            continue
+        fi
+
+        (( i++ < 200 )) || return 1
+        sleep 0.05
+
+    done
+
+    printf '%s\n' "$$" > "${pid}" || { rm -rf -- "${lock}" >/dev/null 2>&1 || true; return 1; }
+
+    if [[ "${run}" == "--" ]]; then
+
+        if [[ $# -gt 0 && "${1:-}" == *$'\n'* ]]; then
+            code="${1}"
+            shift
+            command bash -c "${code}" _ "$@"
+            rc=$?
+        else
+            command bash -s -- "$@"
+            rc=$?
+        fi
+
+    else
+
+        "${run}" "$@"
+        rc=$?
+
+    fi
+
+    rm -rf -- "${lock}" >/dev/null 2>&1 || true
+    return "${rc}"
+
+}
 user::id () {
 
     local user="${1:-}" current="" v=""
@@ -156,7 +212,7 @@ user::exists () {
 }
 user::add () {
 
-    local user="${1:-}" group="${2:-}" uid="" gid="" home="" shell=""
+    local user="${1:-}" group="${2:-}" pass=""
 
     user::valid "${user}" || return 1
     [[ -n "${group}" ]] || group="$(group::name 2>/dev/null || true)"
@@ -181,38 +237,49 @@ user::add () {
     fi
     if sys::is_macos; then
 
-        sys::has dscl || return 1
+        # shellcheck disable=SC2016
+        user::lock "__macos_user_add" -- '
+            user="${1:-}"
+            group="${2:-}"
+            uid=""
+            gid=""
+            home=""
+            shell=""
 
-        uid="$(dscl . -list /Users UniqueID 2>/dev/null | awk '
-            $2 ~ /^[0-9]+$/ && $2 >= 500 {
-                if ( $2 > max ) max = $2
-            }
-            END {
-                if ( max < 500 ) max = 500
-                print max + 1
-            }
-        ')"
+            command -v dscl >/dev/null 2>&1 || exit 1
+            command -v dscacheutil >/dev/null 2>&1 || exit 1
 
-        [[ "${uid}" =~ ^[0-9]+$ ]] || return 1
+            uid="$(dscl . -list /Users UniqueID 2>/dev/null | awk '"'"'
+                $2 ~ /^[0-9]+$/ && $2 >= 500 {
+                    if ( $2 > max ) max = $2
+                }
+                END {
+                    if ( max < 500 ) max = 500
+                    print max + 1
+                }
+            '"'"')"
 
-        gid="$(dscacheutil -q group -a name "${group}" 2>/dev/null | awk '/gid:/ { print $2; exit }')"
-        [[ "${gid}" =~ ^[0-9]+$ ]] || return 1
+            [[ "${uid}" =~ ^[0-9]+$ ]] || exit 1
 
-        home="/Users/${user}"
-        shell="/bin/bash"
+            gid="$(dscacheutil -q group -a name "${group}" 2>/dev/null | awk '"'"'/gid:/ { print $2; exit }'"'"')"
+            [[ "${gid}" =~ ^[0-9]+$ ]] || exit 1
 
-        dscl . -create "/Users/${user}" >/dev/null 2>&1 || return 1
-        dscl . -create "/Users/${user}" UserShell "${shell}" >/dev/null 2>&1 || return 1
-        dscl . -create "/Users/${user}" RealName "${user}" >/dev/null 2>&1 || true
-        dscl . -create "/Users/${user}" UniqueID "${uid}" >/dev/null 2>&1 || return 1
-        dscl . -create "/Users/${user}" PrimaryGroupID "${gid}" >/dev/null 2>&1 || return 1
-        dscl . -create "/Users/${user}" NFSHomeDirectory "${home}" >/dev/null 2>&1 || return 1
+            home="/Users/${user}"
+            shell="/bin/bash"
 
-        if sys::has createhomedir; then
-            createhomedir -c -u "${user}" >/dev/null 2>&1 || true
-        fi
+            dscl . -create "/Users/${user}" >/dev/null 2>&1 || exit 1
+            dscl . -create "/Users/${user}" UserShell "${shell}" >/dev/null 2>&1 || exit 1
+            dscl . -create "/Users/${user}" RealName "${user}" >/dev/null 2>&1 || true
+            dscl . -create "/Users/${user}" UniqueID "${uid}" >/dev/null 2>&1 || exit 1
+            dscl . -create "/Users/${user}" PrimaryGroupID "${gid}" >/dev/null 2>&1 || exit 1
+            dscl . -create "/Users/${user}" NFSHomeDirectory "${home}" >/dev/null 2>&1 || exit 1
 
-        return 0
+            if command -v createhomedir >/dev/null 2>&1; then
+                createhomedir -c -u "${user}" >/dev/null 2>&1 || true
+            fi
+        ' "${user}" "${group}"
+
+        return
 
     fi
     if sys::is_windows; then
@@ -235,12 +302,10 @@ user::add () {
                         -AccountNeverExpires `
                         -ErrorAction Stop | Out-Null
 
-                    try {
-                        Add-LocalGroupMember -Group $group -Member $name -ErrorAction Stop
-                    } catch {}
-
+                    Add-LocalGroupMember -Group $group -Member $name -ErrorAction Stop
                     exit 0
                 } catch {
+                    try { Remove-LocalUser -Name $env:SYS_USER_QUERY -ErrorAction SilentlyContinue } catch {}
                     exit 1
                 }
             ' >/dev/null 2>&1
@@ -250,11 +315,13 @@ user::add () {
         fi
         if sys::has net.exe; then
 
-            local pass=""
             pass="Bx$(date +%s)${RANDOM}aA1!"
-
             net.exe user "${user}" "${pass}" /add >/dev/null 2>&1 || return 1
-            net.exe localgroup "${group}" "${user}" /add >/dev/null 2>&1 || true
+
+            net.exe localgroup "${group}" "${user}" /add >/dev/null 2>&1 || {
+                net.exe user "${user}" /delete >/dev/null 2>&1 || true
+                return 1
+            }
 
             return 0
 
@@ -746,8 +813,10 @@ user::shell () {
     if sys::is_windows; then
 
         if [[ "${user}" == "${current}" && -n "${COMSPEC:-}" ]]; then
+
             printf '%s\n' "${COMSPEC}"
             return 0
+
         fi
         if sys::has powershell.exe; then
 
@@ -902,6 +971,11 @@ group::valid () {
     user::valid "$@"
 
 }
+group::lock () {
+
+    user::lock "$@"
+
+}
 group::id () {
 
     local group="${1:-}" v=""
@@ -996,7 +1070,6 @@ group::exists () {
 
         sys::has dscl || return 1
         dscl . -read "/Groups/${group}" >/dev/null 2>&1 || return 1
-
         return 0
 
     fi
@@ -1188,8 +1261,8 @@ group::all () {
                 ' 2>/dev/null | tr -d '\r' || true)"
 
                 [[ -n "${v}" ]] || return 1
-                printf '%s\n' "${v}" | awk 'NF && !seen[$0]++ { print }'
 
+                printf '%s\n' "${v}" | awk 'NF && !seen[$0]++ { print }'
                 return 0
 
             fi
@@ -1204,8 +1277,8 @@ group::all () {
             ' 2>/dev/null | tr -d '\r' || true)"
 
             [[ -n "${v}" ]] || return 1
-            printf '%s\n' "${v}" | awk 'NF && !seen[$0]++ { print }'
 
+            printf '%s\n' "${v}" | awk 'NF && !seen[$0]++ { print }'
             return 0
 
         fi
@@ -1249,7 +1322,6 @@ group::all () {
 
                 [[ -n "${v}" ]] || return 1
                 printf '%s\n' "${v}"
-
                 return 0
 
             fi
@@ -1267,8 +1339,8 @@ group::all () {
             ' | awk 'NF && !seen[$0]++ { print }' || true)"
 
             [[ -n "${v}" ]] || return 1
-            printf '%s\n' "${v}"
 
+            printf '%s\n' "${v}"
             return 0
 
         fi
@@ -1285,7 +1357,10 @@ group::all () {
             fi
 
             [[ -n "${v}" ]] || return 1
-            for x in ${v}; do printf '%s\n' "${x}"; done | awk 'NF && !seen[$0]++ { print }'
+
+            for x in ${v}; do
+                printf '%s\n' "${x}"
+            done | awk 'NF && !seen[$0]++ { print }'
 
             return 0
 
@@ -1302,8 +1377,8 @@ group::all () {
         fi
 
         [[ -r /etc/group ]] || return 1
-        awk -F: '{ print $1 }' /etc/group 2>/dev/null | awk 'NF && !seen[$0]++ { print }'
 
+        awk -F: '{ print $1 }' /etc/group 2>/dev/null | awk 'NF && !seen[$0]++ { print }'
         return
 
     fi
@@ -1311,7 +1386,6 @@ group::all () {
 
         sys::has dscl || return 1
         dscl . -list /Groups 2>/dev/null | awk 'NF && !seen[$0]++ { print }'
-
         return
 
     fi

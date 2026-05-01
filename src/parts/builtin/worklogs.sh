@@ -4,613 +4,2040 @@ codingmaster@codingmstr:/var/www/projects/bashx$
 
 [[CI LINUX]]
 
+20s
 Run bash src/parts/builtin/test.sh
+[target] user.sh
+[env] os=linux runtime=linux user=root group=root mutate=1
 
-[commands]
-sys::shell               = /usr/bin/bash
-sys::has bash            = 
-sys::which bash          = /usr/bin/bash
-sys::which_all bash      = /usr/bin/bash | /bin/bash
+[0001] api presence
+  PASS function exists: user::valid
+  PASS function exists: user::id
+  PASS function exists: user::name
+  PASS function exists: user::exists
+  PASS function exists: user::add
+  PASS function exists: user::del
+  PASS function exists: user::all
+  PASS function exists: user::groups
+  PASS function exists: user::add_group
+  PASS function exists: user::del_group
+  PASS function exists: user::group
+  PASS function exists: user::home
+  PASS function exists: user::shell
+  PASS function exists: user::is_root
+  PASS function exists: user::is_admin
+  PASS function exists: user::can_sudo
+  PASS function exists: group::valid
+  PASS function exists: group::id
+  PASS function exists: group::name
+  PASS function exists: group::exists
+  PASS function exists: group::add
+  PASS function exists: group::del
+  PASS function exists: group::all
+  PASS function exists: group::users
+  PASS function exists: group::add_user
+  PASS function exists: group::del_user
 
-[platform]
-sys::name                = linux
-sys::runtime             = linux
-sys::kernel              = Linux
-sys::distro              = ubuntu
-sys::pkg_manager         = apt
-sys::svc_manager         = systemd
-sys::fw_manager          = ufw
-sys::arch                = x64
-sys::version             = 6.17.0-1010-azure
+[0002] validation API
+  PASS user::valid accepts root
+  PASS group::valid accepts root
+  PASS user::valid accepts root
+  PASS group::valid accepts root
+  PASS user::valid accepts bx78687439ua
+  PASS group::valid accepts bx78687439ua
+  PASS user::valid accepts bx78687439ga
+  PASS group::valid accepts bx78687439ga
+  PASS user::valid accepts abc_123
+  PASS group::valid accepts abc_123
+  PASS user::valid accepts abc-123
+  PASS group::valid accepts abc-123
+  PASS user::valid rejects hostile []
+  PASS group::valid rejects hostile []
+  PASS user::valid rejects hostile [*]
+  PASS group::valid rejects hostile [*]
+  PASS user::valid rejects hostile [?]
+  PASS group::valid rejects hostile [?]
+  PASS user::valid rejects hostile [[abc]]
+  PASS group::valid rejects hostile [[abc]]
+  PASS user::valid rejects hostile [bad/name]
+  PASS group::valid rejects hostile [bad/name]
+  PASS user::valid rejects hostile [bad\name]
+  PASS group::valid rejects hostile [bad\name]
+  PASS user::valid rejects hostile [bad
+name]
+  PASS group::valid rejects hostile [bad
+name]
+  PASS user::valid rejects hostile [bad
+name]
+  PASS group::valid rejects hostile [bad
+name]
 
-[env/constants]
-sys::path_sep            = :
-sys::line_sep            = lf
-sys::path_name           = PATH
-sys::exe_suffix          = 
-sys::lib_suffix          = .so
-sys::path_dirs           = /snap/bin | /home/runner/.local/bin | /opt/pipx_bin | /home/runner/.cargo/bin | /home/runner/.config/composer/vendor/bin | /usr/local/.ghcup/bin | /home/runner/.dotnet/tools | /usr/local/sbin | /usr/local/bin | /usr/sbin | /usr/bin | /sbin | /bin | /usr/games | /usr/local/games | /snap/bin
+[0003] current identity reads
+  PASS user::name nonempty
+  PASS user::id nonempty
+  PASS user::id numeric
+  PASS user::group nonempty
+  PASS group::name nonempty
+  PASS group::id nonempty
+  PASS group::id numeric
+  PASS user::home nonempty
+  PASS user::shell nonempty
+  PASS user::name no CR/LF
+  PASS group::name no CR/LF
 
-[identity]
-sys::hostname            = runnervmeorf1
-sys::username            = runner
-sys::pid                 = 2293
-sys::ppid                = 2292
-sys::umask               = 0022
-sys::locale              = C.UTF-8
-sys::timezone            = Etc/UTC
-sys::proxy               = 
-sys::ip                  = 10.1.0.254 172.17.0.1
+[0004] identity repeatability
+  PASS repeat user::name 1
+  PASS repeat user::id 1
+  PASS repeat user::group 1
+  PASS repeat group::id 1
+  PASS repeat user::name 2
+  PASS repeat user::id 2
+  PASS repeat user::group 2
+  PASS repeat group::id 2
+  PASS repeat user::name 3
+  PASS repeat user::id 3
+  PASS repeat user::group 3
+  PASS repeat group::id 3
+  PASS repeat user::name 4
+  PASS repeat user::id 4
+  PASS repeat user::group 4
+  PASS repeat group::id 4
+  PASS repeat user::name 5
+  PASS repeat user::id 5
+  PASS repeat user::group 5
+  PASS repeat group::id 5
+  PASS repeat user::name 6
+  PASS repeat user::id 6
+  PASS repeat user::group 6
+  PASS repeat group::id 6
+  PASS repeat user::name 7
+  PASS repeat user::id 7
+  PASS repeat user::group 7
+  PASS repeat group::id 7
+  PASS repeat user::name 8
+  PASS repeat user::id 8
+  PASS repeat user::group 8
+  PASS repeat group::id 8
+  PASS repeat user::name 9
+  PASS repeat user::id 9
+  PASS repeat user::group 9
+  PASS repeat group::id 9
+  PASS repeat user::name 10
+  PASS repeat user::id 10
+  PASS repeat user::group 10
+  PASS repeat group::id 10
+  PASS repeat user::name 11
+  PASS repeat user::id 11
+  PASS repeat user::group 11
+  PASS repeat group::id 11
+  PASS repeat user::name 12
+  PASS repeat user::id 12
+  PASS repeat user::group 12
+  PASS repeat group::id 12
 
-[ci/runtime flags]
-sys::ci_name             = github
-sys::is_ci               = 
-sys::is_ci_pull          = <failed:1>
-sys::is_ci_push          = 
-sys::is_ci_tag           = <failed:1>
-sys::is_linux            = 
-sys::is_macos            = <failed:1>
-sys::is_windows          = <failed:1>
-sys::is_wsl              = <failed:1>
-sys::is_msys             = <failed:1>
-sys::is_gitbash          = <failed:1>
-sys::is_cygwin           = <failed:1>
-sys::is_unix             = 
-sys::is_posix            = 
-sys::is_gui              = <failed:1>
-sys::is_headless         = 
-sys::is_terminal         = <failed:1>
-sys::is_interactive      = <failed:1>
-sys::is_container        = <failed:1>
-sys::is_root             = <failed:1>
-sys::is_admin            = <failed:1>
-sys::can_sudo            = 
+[0005] user::exists matrix
+  PASS current user exists
+  PASS current user in current group
+  PASS fake user missing
+  PASS fake user in current group missing
+  PASS current user in fake group missing
+  PASS user::exists rejects bad user []
+  PASS user::exists rejects bad user [*]
+  PASS user::exists rejects bad user [?]
+  PASS user::exists rejects bad user [[x]]
+  PASS user::exists rejects bad user [bad/name]
+  PASS user::exists rejects bad user [bad
+name]
+  PASS user::exists rejects bad user [bad
+name]
+  PASS user::exists rejects bad group [*]
+  PASS user::exists rejects bad group [?]
+  PASS user::exists rejects bad group [[x]]
+  PASS user::exists rejects bad group [bad/name]
+  PASS user::exists rejects bad group [bad
+group]
+  PASS user::exists rejects bad group [bad
+group]
 
-[time/load]
-sys::uptime              = 224
-sys::loadavg             = 0.01 0.04 0.01
+[0006] group::exists matrix
+  PASS current group exists
+  PASS fake group missing
+  PASS group::exists rejects bad group []
+  PASS group::exists rejects bad group [*]
+  PASS group::exists rejects bad group [?]
+  PASS group::exists rejects bad group [[x]]
+  PASS group::exists rejects bad group [bad/name]
+  PASS group::exists rejects bad group [bad
+group]
+  PASS group::exists rejects bad group [bad
+group]
 
-[disk]
-sys::disk_total .        = 154894188544
-sys::disk_free .         = 95588032512
-sys::disk_used .         = 59306156032
-sys::disk_percent .      = 38
-sys::disk_size .         = 1077248
-sys::disk_info .         = path=. | total=154894188544 | free=95588032512 | used=59306156032 | percent=38
+[0007] id matrices
+  PASS implicit id equals explicit current
+  PASS fake user id fails
+  PASS implicit group id equals explicit current
+  PASS fake group id fails
+  PASS user::id rejects bad [*]
+  PASS group::id rejects bad [*]
+  PASS user::id rejects bad [?]
+  PASS group::id rejects bad [?]
+  PASS user::id rejects bad [[x]]
+  PASS group::id rejects bad [[x]]
+  PASS user::id rejects bad [bad/name]
+  PASS group::id rejects bad [bad/name]
+  PASS user::id rejects bad [bad
+x]
+  PASS group::id rejects bad [bad
+x]
+  PASS user::id rejects bad [bad
+x]
+  PASS group::id rejects bad [bad
+x]
 
-[memory]
-sys::mem_total           = 16766431232
-sys::mem_free            = 15838982144
-sys::mem_used            = 927649792
-sys::mem_percent         = 5
-sys::mem_info            = total=16766431232 | free=15838793728 | used=927637504 | percent=5
+[0008] list all users/groups
+  PASS user::all nonempty
+  PASS group::all nonempty
+  PASS user::all contains current user
+  PASS group::all contains current group
+  PASS user::all excludes fake user
+  PASS group::all excludes fake group
+  PASS user::all unique
+  PASS group::all unique
 
-[cpu]
-sys::cpu_threads         = 4
-sys::cpu_count           = 4
-sys::cpu_cores           = 2
-sys::cpu_model           = AMD EPYC 7763 64-Core Processor
-sys::cpu_usage           = 3
-sys::cpu_idle            = 100
-sys::cpu_info            = model=AMD EPYC 7763 64-Core Processor | cores=2 | threads=4 | usage=0 | idle=100
+[0009] membership listing wrappers
+  PASS user::groups current nonempty
+  PASS group::users current nonempty
+  PASS user::groups contains current group
+  PASS group::users contains current user
+  PASS user::groups current equals group::all user
+  PASS group::users current equals user::all group
+  PASS user::groups fake user fails
+  PASS group::users fake group fails
+  PASS user::groups rejects wildcard
+  PASS group::users rejects wildcard
 
-[bash]
-sys::bash_version        = 5.2.21(1)-release
-sys::bash_major          = 5
-sys::bash_minor          = 2
-sys::bash_msrv 5         = 
-sys::find_bash 5         = /usr/bin/bash
+[0010] home and shell reads
+  PASS implicit home nonempty
+  PASS explicit home nonempty
+  PASS implicit explicit home stable
+  PASS implicit shell nonempty
+  PASS explicit shell nonempty
+  PASS implicit explicit shell stable
+  PASS fake user home fails
+  PASS fake user shell fails
 
-[done]
+[0011] privilege checks
+  PASS user::is_root true branch
+  PASS user::is_admin true branch
+  PASS user::can_sudo true branch
+  PASS is_root fake user fails
+  PASS is_admin fake user fails
+  PASS can_sudo fake user fails
+  PASS non-windows can_sudo callable
 
-[[CI MACOS]]
+[0012] pre-mutation clean state
+  PASS user A absent
+  PASS user B absent
+  PASS group A absent
+  PASS group B absent
+  PASS group C absent
 
+[0013] group lifecycle destructive
+  PASS group add A
+  PASS group exists A
+  PASS group add A idempotent
+  PASS group id A
+  PASS group::all contains A
+  PASS group add invalid empty
+  PASS group add invalid wildcard
+  PASS group add invalid newline
+  PASS group del A
+  PASS group A gone
+  PASS group del A idempotent
+  PASS group del invalid empty
+  PASS group del invalid wildcard
+
+[0014] user create-only strict lifecycle
+  PASS group add A
+  PASS group add B
+  PASS user add A in group A
+  PASS user A exists
+  PASS user A in group A
+  PASS user add A group A idempotent
+  PASS user add A group B strict fails
+  PASS user A id
+  PASS user A group
+  PASS user A home
+  PASS user A shell
+  PASS user::all contains A
+  PASS group::users A contains user A
+  PASS user add invalid empty
+  PASS user add invalid wildcard
+  PASS user add invalid newline
+  PASS user add fake group fails
+  PASS user del A wrong group B fails
+  PASS user A survives wrong group del
+  PASS user del A with group A
+  PASS user A gone
+  PASS user del A idempotent
+  PASS group del A
+  PASS group del B
+
+[0015] membership lifecycle user namespace
+  PASS group add A
+  PASS group add B
+  PASS user add A in group A
+  PASS user A not in group B
+  PASS user add_group A B
+  PASS user A now in B
+  PASS user add_group A B idempotent
+  PASS user::groups A contains B
+  PASS group::users B contains A
+  PASS user del_group A B
+  PASS user A no longer in B
+  PASS user del_group A B idempotent
+  PASS add_group fake user fails
+  PASS add_group creates missing group C
+  PASS group C created by user::add_group
+  PASS user A in group C
+  PASS user del A
+  PASS group del A
+  PASS group del B
+  PASS group del C
+
+[0016] membership lifecycle group namespace strict
+  PASS group add A
+  PASS group add C
+  PASS user add B in group A
+  PASS group add_user C B
+  PASS user B in group C
+  PASS group add_user C B idempotent
+  PASS group add_user missing group fails
+  PASS group add_user missing user fails
+  PASS group add_user invalid group fails
+  PASS group add_user invalid user fails
+  PASS group del_user C B
+  PASS user B not in C
+  PASS group del_user C B idempotent
+  PASS group del_user missing group fails
+  PASS group del_user missing user fails
+  PASS user del B
+  PASS group del A
+  PASS group del C
+
+[0017] delete safety and idempotency
+  PASS user::del empty rejects
+  PASS user::del wildcard rejects
+  PASS user::del newline rejects
+  PASS user::del valid missing idempotent
+  PASS user::del valid missing with group fails
+  PASS group::del empty rejects
+  PASS group::del wildcard rejects
+  PASS group::del newline rejects
+  PASS group::del valid missing idempotent
+
+[0018] hostile input sweep
+  PASS user::exists hostile *
+  PASS user::id hostile *
+  PASS user::group hostile *
+  PASS user::home hostile *
+  PASS user::shell hostile *
+  PASS user::groups hostile *
+  PASS group::exists hostile *
+  PASS group::id hostile *
+  PASS group::users hostile *
+  PASS user::exists hostile ?
+  PASS user::id hostile ?
+  PASS user::group hostile ?
+  PASS user::home hostile ?
+  PASS user::shell hostile ?
+  PASS user::groups hostile ?
+  PASS group::exists hostile ?
+  PASS group::id hostile ?
+  PASS group::users hostile ?
+  PASS user::exists hostile [abc]
+  PASS user::id hostile [abc]
+  PASS user::group hostile [abc]
+  PASS user::home hostile [abc]
+  PASS user::shell hostile [abc]
+  PASS user::groups hostile [abc]
+  PASS group::exists hostile [abc]
+  PASS group::id hostile [abc]
+  PASS group::users hostile [abc]
+  PASS user::exists hostile bad/name
+  PASS user::id hostile bad/name
+  PASS user::group hostile bad/name
+  PASS user::home hostile bad/name
+  PASS user::shell hostile bad/name
+  PASS user::groups hostile bad/name
+  PASS group::exists hostile bad/name
+  PASS group::id hostile bad/name
+  PASS group::users hostile bad/name
+  PASS user::exists hostile bad\name
+  PASS user::id hostile bad\name
+  PASS user::group hostile bad\name
+  PASS user::home hostile bad\name
+  PASS user::shell hostile bad\name
+  PASS user::groups hostile bad\name
+  PASS group::exists hostile bad\name
+  PASS group::id hostile bad\name
+  PASS group::users hostile bad\name
+  PASS user::exists hostile $USER
+  PASS user::id hostile $USER
+  PASS user::group hostile $USER
+  PASS user::home hostile $USER
+  PASS user::shell hostile $USER
+  PASS user::groups hostile $USER
+  PASS group::exists hostile $USER
+  PASS group::id hostile $USER
+  PASS group::users hostile $USER
+  PASS user::exists hostile $(id)
+  PASS user::id hostile $(id)
+  PASS user::group hostile $(id)
+  PASS user::home hostile $(id)
+  PASS user::shell hostile $(id)
+  PASS user::groups hostile $(id)
+  PASS group::exists hostile $(id)
+  PASS group::id hostile $(id)
+  PASS group::users hostile $(id)
+  PASS user::exists hostile ;true
+  PASS user::id hostile ;true
+  PASS user::group hostile ;true
+  PASS user::home hostile ;true
+  PASS user::shell hostile ;true
+  PASS user::groups hostile ;true
+  PASS group::exists hostile ;true
+  PASS group::id hostile ;true
+  PASS group::users hostile ;true
+  PASS user::exists hostile x
+y
+  PASS user::id hostile x
+y
+  PASS user::group hostile x
+y
+  PASS user::home hostile x
+y
+  PASS user::shell hostile x
+y
+  PASS user::groups hostile x
+y
+  PASS group::exists hostile x
+y
+  PASS group::id hostile x
+y
+  PASS group::users hostile x
+y
+  PASS user::exists hostile x
+y
+  PASS user::id hostile x
+y
+  PASS user::group hostile x
+y
+  PASS user::home hostile x
+y
+  PASS user::shell hostile x
+y
+  PASS user::groups hostile x
+y
+  PASS group::exists hostile x
+y
+  PASS group::id hostile x
+y
+  PASS group::users hostile x
+y
+
+[0019] read stress
+  PASS stress user::name 1
+  PASS stress user::id 1
+  PASS stress user::group 1
+  PASS stress user::home 1
+  PASS stress user::shell 1
+  PASS stress user::all 1
+  PASS stress group::all 1
+  PASS stress user::name 2
+  PASS stress user::id 2
+  PASS stress user::group 2
+  PASS stress user::home 2
+  PASS stress user::shell 2
+  PASS stress user::all 2
+  PASS stress group::all 2
+  PASS stress user::name 3
+  PASS stress user::id 3
+  PASS stress user::group 3
+  PASS stress user::home 3
+  PASS stress user::shell 3
+  PASS stress user::all 3
+  PASS stress group::all 3
+  PASS stress user::name 4
+  PASS stress user::id 4
+  PASS stress user::group 4
+  PASS stress user::home 4
+  PASS stress user::shell 4
+  PASS stress user::all 4
+  PASS stress group::all 4
+  PASS stress user::name 5
+  PASS stress user::id 5
+  PASS stress user::group 5
+  PASS stress user::home 5
+  PASS stress user::shell 5
+  PASS stress user::all 5
+  PASS stress group::all 5
+  PASS stress user::name 6
+  PASS stress user::id 6
+  PASS stress user::group 6
+  PASS stress user::home 6
+  PASS stress user::shell 6
+  PASS stress user::all 6
+  PASS stress group::all 6
+  PASS stress user::name 7
+  PASS stress user::id 7
+  PASS stress user::group 7
+  PASS stress user::home 7
+  PASS stress user::shell 7
+  PASS stress user::all 7
+  PASS stress group::all 7
+  PASS stress user::name 8
+  PASS stress user::id 8
+  PASS stress user::group 8
+  PASS stress user::home 8
+  PASS stress user::shell 8
+  PASS stress user::all 8
+  PASS stress group::all 8
+  PASS stress user::name 9
+  PASS stress user::id 9
+  PASS stress user::group 9
+  PASS stress user::home 9
+  PASS stress user::shell 9
+  PASS stress user::all 9
+  PASS stress group::all 9
+  PASS stress user::name 10
+  PASS stress user::id 10
+  PASS stress user::group 10
+  PASS stress user::home 10
+  PASS stress user::shell 10
+  PASS stress user::all 10
+  PASS stress group::all 10
+  PASS stress user::name 11
+  PASS stress user::id 11
+  PASS stress user::group 11
+  PASS stress user::home 11
+  PASS stress user::shell 11
+  PASS stress user::all 11
+  PASS stress group::all 11
+  PASS stress user::name 12
+  PASS stress user::id 12
+  PASS stress user::group 12
+  PASS stress user::home 12
+  PASS stress user::shell 12
+  PASS stress user::all 12
+  PASS stress group::all 12
+  PASS stress user::name 13
+  PASS stress user::id 13
+  PASS stress user::group 13
+  PASS stress user::home 13
+  PASS stress user::shell 13
+  PASS stress user::all 13
+  PASS stress group::all 13
+  PASS stress user::name 14
+  PASS stress user::id 14
+  PASS stress user::group 14
+  PASS stress user::home 14
+  PASS stress user::shell 14
+  PASS stress user::all 14
+  PASS stress group::all 14
+  PASS stress user::name 15
+  PASS stress user::id 15
+  PASS stress user::group 15
+  PASS stress user::home 15
+  PASS stress user::shell 15
+  PASS stress user::all 15
+  PASS stress group::all 15
+  PASS stress user::name 16
+  PASS stress user::id 16
+  PASS stress user::group 16
+  PASS stress user::home 16
+  PASS stress user::shell 16
+  PASS stress user::all 16
+  PASS stress group::all 16
+  PASS stress user::name 17
+  PASS stress user::id 17
+  PASS stress user::group 17
+  PASS stress user::home 17
+  PASS stress user::shell 17
+  PASS stress user::all 17
+  PASS stress group::all 17
+  PASS stress user::name 18
+  PASS stress user::id 18
+  PASS stress user::group 18
+  PASS stress user::home 18
+  PASS stress user::shell 18
+  PASS stress user::all 18
+  PASS stress group::all 18
+  PASS stress user::name 19
+  PASS stress user::id 19
+  PASS stress user::group 19
+  PASS stress user::home 19
+  PASS stress user::shell 19
+  PASS stress user::all 19
+  PASS stress group::all 19
+  PASS stress user::name 20
+  PASS stress user::id 20
+  PASS stress user::group 20
+  PASS stress user::home 20
+  PASS stress user::shell 20
+  PASS stress user::all 20
+  PASS stress group::all 20
+  PASS stress user::name 21
+  PASS stress user::id 21
+  PASS stress user::group 21
+  PASS stress user::home 21
+  PASS stress user::shell 21
+  PASS stress user::all 21
+  PASS stress group::all 21
+  PASS stress user::name 22
+  PASS stress user::id 22
+  PASS stress user::group 22
+  PASS stress user::home 22
+  PASS stress user::shell 22
+  PASS stress user::all 22
+  PASS stress group::all 22
+  PASS stress user::name 23
+  PASS stress user::id 23
+  PASS stress user::group 23
+  PASS stress user::home 23
+  PASS stress user::shell 23
+  PASS stress user::all 23
+  PASS stress group::all 23
+  PASS stress user::name 24
+  PASS stress user::id 24
+  PASS stress user::group 24
+  PASS stress user::home 24
+  PASS stress user::shell 24
+  PASS stress user::all 24
+  PASS stress group::all 24
+  PASS stress user::name 25
+  PASS stress user::id 25
+  PASS stress user::group 25
+  PASS stress user::home 25
+  PASS stress user::shell 25
+  PASS stress user::all 25
+  PASS stress group::all 25
+  PASS stress user::name 26
+  PASS stress user::id 26
+  PASS stress user::group 26
+  PASS stress user::home 26
+  PASS stress user::shell 26
+  PASS stress user::all 26
+  PASS stress group::all 26
+  PASS stress user::name 27
+  PASS stress user::id 27
+  PASS stress user::group 27
+  PASS stress user::home 27
+  PASS stress user::shell 27
+  PASS stress user::all 27
+  PASS stress group::all 27
+  PASS stress user::name 28
+  PASS stress user::id 28
+  PASS stress user::group 28
+  PASS stress user::home 28
+  PASS stress user::shell 28
+  PASS stress user::all 28
+  PASS stress group::all 28
+  PASS stress user::name 29
+  PASS stress user::id 29
+  PASS stress user::group 29
+  PASS stress user::home 29
+  PASS stress user::shell 29
+  PASS stress user::all 29
+  PASS stress group::all 29
+  PASS stress user::name 30
+  PASS stress user::id 30
+  PASS stress user::group 30
+  PASS stress user::home 30
+  PASS stress user::shell 30
+  PASS stress user::all 30
+  PASS stress group::all 30
+
+[0020] final cleanup assertion
+  PASS final user A absent
+  PASS final user B absent
+  PASS final user C absent
+  PASS final group A absent
+  PASS final group B absent
+  PASS final group C absent
+
+============================================================
+ user.sh legendary production test summary
+============================================================
+Total sections : 20
+Pass           : 584
+Fail           : 0
+Skip           : 0
+Root           : /tmp/bashx-user-legendary.CEKwP0
+Prefix         : bx78687439
+============================================================
+
+[[ CI MACOS ]]
+
+59s
 Run bash src/parts/builtin/test.sh
+✔︎ JSON API formula_tap_migrations.jws.json
+✔︎ JSON API cask_tap_migrations.jws.json
+==> Fetching downloads for: bash
+✔︎ Bottle Manifest bash (5.3.9)
+✔︎ Bottle Manifest ncurses (6.6)
+✔︎ Bottle bash (5.3.9)
+✔︎ Bottle ncurses (6.6)
+==> Installing bash dependency: ncurses
+==> Pouring ncurses--6.6.arm64_sequoia.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/ncurses/6.6: 4,086 files, 10.6MB
+==> Pouring bash--5.3.9.arm64_sequoia.bottle.tar.gz
+==> Caveats
+DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/lib/bash:/opt/local/lib/bash:/usr/pkg/lib/bash:/opt/pkg/lib/bash:.
+==> Summary
+🍺  /opt/homebrew/Cellar/bash/5.3.9: 172 files, 13.8MB
+==> Caveats
+==> bash
+DEFAULT_LOADABLE_BUILTINS_PATH: /opt/homebrew/lib/bash:/usr/local/lib/bash:/usr/lib/bash:/opt/local/lib/bash:/usr/pkg/lib/bash:/opt/pkg/lib/bash:.
+[target] user.sh
+[env] os=macos runtime=macos user=root group=wheel mutate=1
 
-[commands]
-sys::shell               = /bin/bash
-sys::has bash            = 
-sys::which bash          = /bin/bash
-sys::which_all bash      = /bin/bash
+[0001] api presence
+  PASS function exists: user::valid
+  PASS function exists: user::id
+  PASS function exists: user::name
+  PASS function exists: user::exists
+  PASS function exists: user::add
+  PASS function exists: user::del
+  PASS function exists: user::all
+  PASS function exists: user::groups
+  PASS function exists: user::add_group
+  PASS function exists: user::del_group
+  PASS function exists: user::group
+  PASS function exists: user::home
+  PASS function exists: user::shell
+  PASS function exists: user::is_root
+  PASS function exists: user::is_admin
+  PASS function exists: user::can_sudo
+  PASS function exists: group::valid
+  PASS function exists: group::id
+  PASS function exists: group::name
+  PASS function exists: group::exists
+  PASS function exists: group::add
+  PASS function exists: group::del
+  PASS function exists: group::all
+  PASS function exists: group::users
+  PASS function exists: group::add_user
+  PASS function exists: group::del_user
 
-[platform]
-sys::name                = macos
-sys::runtime             = macos
-sys::kernel              = Darwin
-sys::distro              = macos
-sys::pkg_manager         = brew
-sys::svc_manager         = launchd
-sys::fw_manager          = pf
-sys::arch                = arm64
-sys::version             = 15.7.4
+[0002] validation API
+  PASS user::valid accepts root
+  PASS group::valid accepts root
+  PASS user::valid accepts wheel
+  PASS group::valid accepts wheel
+  PASS user::valid accepts bx26506796ua
+  PASS group::valid accepts bx26506796ua
+  PASS user::valid accepts bx26506796ga
+  PASS group::valid accepts bx26506796ga
+  PASS user::valid accepts abc_123
+  PASS group::valid accepts abc_123
+  PASS user::valid accepts abc-123
+  PASS group::valid accepts abc-123
+  PASS user::valid rejects hostile []
+  PASS group::valid rejects hostile []
+  PASS user::valid rejects hostile [*]
+  PASS group::valid rejects hostile [*]
+  PASS user::valid rejects hostile [?]
+  PASS group::valid rejects hostile [?]
+  PASS user::valid rejects hostile [[abc]]
+  PASS group::valid rejects hostile [[abc]]
+  PASS user::valid rejects hostile [bad/name]
+  PASS group::valid rejects hostile [bad/name]
+  PASS user::valid rejects hostile [bad\name]
+  PASS group::valid rejects hostile [bad\name]
+  PASS user::valid rejects hostile [bad
+name]
+  PASS group::valid rejects hostile [bad
+name]
+  PASS user::valid rejects hostile [bad
+name]
+  PASS group::valid rejects hostile [bad
+name]
 
-[env/constants]
-sys::path_sep            = :
-sys::line_sep            = lf
-sys::path_name           = PATH
-sys::exe_suffix          = 
-sys::lib_suffix          = .dylib
-sys::path_dirs           = /opt/homebrew/lib/ruby/gems/3.3.0/bin | /opt/homebrew/opt/ruby@3.3/bin | /Users/runner/.local/bin | /opt/homebrew/bin | /opt/homebrew/sbin | /Users/runner/.cargo/bin | /usr/local/opt/curl/bin | /usr/local/bin | /usr/local/sbin | /Users/runner/bin | /Users/runner/.yarn/bin | /Users/runner/Library/Android/sdk/tools | /Users/runner/Library/Android/sdk/platform-tools | /Library/Frameworks/Python.framework/Versions/Current/bin | /Library/Frameworks/Mono.framework/Versions/Current/Commands | /usr/bin | /bin | /usr/sbin | /sbin | /Users/runner/.dotnet/tools
+[0003] current identity reads
+  PASS user::name nonempty
+  PASS user::id nonempty
+  PASS user::id numeric
+  PASS user::group nonempty
+  PASS group::name nonempty
+  PASS group::id nonempty
+  PASS group::id numeric
+  PASS user::home nonempty
+  PASS user::shell nonempty
+  PASS user::name no CR/LF
+  PASS group::name no CR/LF
 
-[identity]
-sys::hostname            = sjc22-bt150-85f0c166-9072-4734-abd5-85274896fbda-BA3028561CF0.local
-sys::username            = runner
-sys::pid                 = 1815
-sys::ppid                = 1813
-sys::umask               = 0022
-sys::locale              = en_US.UTF-8
-sys::timezone            = UTC
-sys::proxy               = 
-sys::ip                  = 192.168.64.7
+[0004] identity repeatability
+  PASS repeat user::name 1
+  PASS repeat user::id 1
+  PASS repeat user::group 1
+  PASS repeat group::id 1
+  PASS repeat user::name 2
+  PASS repeat user::id 2
+  PASS repeat user::group 2
+  PASS repeat group::id 2
+  PASS repeat user::name 3
+  PASS repeat user::id 3
+  PASS repeat user::group 3
+  PASS repeat group::id 3
+  PASS repeat user::name 4
+  PASS repeat user::id 4
+  PASS repeat user::group 4
+  PASS repeat group::id 4
+  PASS repeat user::name 5
+  PASS repeat user::id 5
+  PASS repeat user::group 5
+  PASS repeat group::id 5
+  PASS repeat user::name 6
+  PASS repeat user::id 6
+  PASS repeat user::group 6
+  PASS repeat group::id 6
+  PASS repeat user::name 7
+  PASS repeat user::id 7
+  PASS repeat user::group 7
+  PASS repeat group::id 7
+  PASS repeat user::name 8
+  PASS repeat user::id 8
+  PASS repeat user::group 8
+  PASS repeat group::id 8
+  PASS repeat user::name 9
+  PASS repeat user::id 9
+  PASS repeat user::group 9
+  PASS repeat group::id 9
+  PASS repeat user::name 10
+  PASS repeat user::id 10
+  PASS repeat user::group 10
+  PASS repeat group::id 10
+  PASS repeat user::name 11
+  PASS repeat user::id 11
+  PASS repeat user::group 11
+  PASS repeat group::id 11
+  PASS repeat user::name 12
+  PASS repeat user::id 12
+  PASS repeat user::group 12
+  PASS repeat group::id 12
 
-[ci/runtime flags]
-sys::ci_name             = github
-sys::is_ci               = 
-sys::is_ci_pull          = <failed:1>
-sys::is_ci_push          = 
-sys::is_ci_tag           = <failed:1>
-sys::is_linux            = <failed:1>
-sys::is_macos            = 
-sys::is_windows          = <failed:1>
-sys::is_wsl              = <failed:1>
-sys::is_msys             = <failed:1>
-sys::is_gitbash          = <failed:1>
-sys::is_cygwin           = <failed:1>
-sys::is_unix             = 
-sys::is_posix            = 
-sys::is_gui              = <failed:1>
-sys::is_headless         = 
-sys::is_terminal         = <failed:1>
-sys::is_interactive      = <failed:1>
-sys::is_container        = <failed:1>
-sys::is_root             = <failed:1>
-sys::is_admin            = 
-sys::can_sudo            = 
+[0005] user::exists matrix
+  PASS current user exists
+  PASS current user in current group
+  PASS fake user missing
+  PASS fake user in current group missing
+  PASS current user in fake group missing
+  PASS user::exists rejects bad user []
+  PASS user::exists rejects bad user [*]
+  PASS user::exists rejects bad user [?]
+  PASS user::exists rejects bad user [[x]]
+  PASS user::exists rejects bad user [bad/name]
+  PASS user::exists rejects bad user [bad
+name]
+  PASS user::exists rejects bad user [bad
+name]
+  PASS user::exists rejects bad group [*]
+  PASS user::exists rejects bad group [?]
+  PASS user::exists rejects bad group [[x]]
+  PASS user::exists rejects bad group [bad/name]
+  PASS user::exists rejects bad group [bad
+group]
+  PASS user::exists rejects bad group [bad
+group]
 
-[time/load]
-sys::uptime              = 1777566289
-sys::loadavg             = 35.24 30.00 13.40
+[0006] group::exists matrix
+  PASS current group exists
+  PASS fake group missing
+  PASS group::exists rejects bad group []
+  PASS group::exists rejects bad group [*]
+  PASS group::exists rejects bad group [?]
+  PASS group::exists rejects bad group [[x]]
+  PASS group::exists rejects bad group [bad/name]
+  PASS group::exists rejects bad group [bad
+group]
+  PASS group::exists rejects bad group [bad
+group]
 
-[disk]
-sys::disk_total .        = 343073095680
-sys::disk_free .         = 48243965952
-sys::disk_used .         = 294829129728
-sys::disk_percent .      = 85
-sys::disk_size .         = 823296
-sys::disk_info .         = path=. | total=343073095680 | free=48243974144 | used=294829121536 | percent=85
+[0007] id matrices
+  PASS implicit id equals explicit current
+  PASS fake user id fails
+  PASS implicit group id equals explicit current
+  PASS fake group id fails
+  PASS user::id rejects bad [*]
+  PASS group::id rejects bad [*]
+  PASS user::id rejects bad [?]
+  PASS group::id rejects bad [?]
+  PASS user::id rejects bad [[x]]
+  PASS group::id rejects bad [[x]]
+  PASS user::id rejects bad [bad/name]
+  PASS group::id rejects bad [bad/name]
+  PASS user::id rejects bad [bad
+x]
+  PASS group::id rejects bad [bad
+x]
+  PASS user::id rejects bad [bad
+x]
+  PASS group::id rejects bad [bad
+x]
 
-[memory]
-sys::mem_total           = 7516192768
-sys::mem_free            = 3352412160
-sys::mem_used            = 4166369280
-sys::mem_percent         = 55
-sys::mem_info            = total=7516192768 | free=3357392896 | used=4158799872 | percent=55
+[0008] list all users/groups
+  PASS user::all nonempty
+  PASS group::all nonempty
+  PASS user::all contains current user
+  PASS group::all contains current group
+  PASS user::all excludes fake user
+  PASS group::all excludes fake group
+  PASS user::all unique
+  PASS group::all unique
 
-[cpu]
-sys::cpu_threads         = 3
-sys::cpu_count           = 3
-sys::cpu_cores           = 3
-sys::cpu_model           = Apple M1 (Virtual)
-sys::cpu_usage           = 88
-sys::cpu_idle            = 0
-sys::cpu_info            = model=Apple M1 (Virtual) | cores=3 | threads=3 | usage=35 | idle=65
+[0009] membership listing wrappers
+  PASS user::groups current nonempty
+  PASS group::users current nonempty
+  PASS user::groups contains current group
+  PASS group::users contains current user
+  PASS user::groups current equals group::all user
+  PASS group::users current equals user::all group
+  PASS user::groups fake user fails
+  PASS group::users fake group fails
+  PASS user::groups rejects wildcard
+  PASS group::users rejects wildcard
 
-[bash]
-sys::bash_version        = 3.2.57(1)-release
-sys::bash_major          = 3
-sys::bash_minor          = 2
-sys::bash_msrv 5         = <failed:1>
-sys::find_bash 5         = <failed:1>
+[0010] home and shell reads
+  PASS implicit home nonempty
+  PASS explicit home nonempty
+  PASS implicit explicit home stable
+  PASS implicit shell nonempty
+  PASS explicit shell nonempty
+  PASS implicit explicit shell stable
+  PASS fake user home fails
+  PASS fake user shell fails
 
-[done]
+[0011] privilege checks
+  PASS user::is_root true branch
+  PASS user::is_admin true branch
+  PASS user::can_sudo true branch
+  PASS is_root fake user fails
+  PASS is_admin fake user fails
+  PASS can_sudo fake user fails
+  PASS non-windows can_sudo callable
 
-[[CI WINDOWS]]
+[0012] pre-mutation clean state
+  PASS user A absent
+  PASS user B absent
+  PASS group A absent
+  PASS group B absent
+  PASS group C absent
 
+[0013] group lifecycle destructive
+  PASS group add A
+  PASS group exists A
+  PASS group add A idempotent
+  PASS group id A
+  PASS group::all contains A
+  PASS group add invalid empty
+  PASS group add invalid wildcard
+  PASS group add invalid newline
+  PASS group del A
+  PASS group A gone
+  PASS group del A idempotent
+  PASS group del invalid empty
+  PASS group del invalid wildcard
+
+[0014] user create-only strict lifecycle
+  PASS group add A
+  PASS group add B
+  PASS user add A in group A
+  PASS user A exists
+  PASS user A in group A
+  PASS user add A group A idempotent
+  PASS user add A group B strict fails
+  PASS user A id
+  PASS user A group
+  PASS user A home
+  PASS user A shell
+  PASS user::all contains A
+  PASS group::users A contains user A
+  PASS user add invalid empty
+  PASS user add invalid wildcard
+  PASS user add invalid newline
+  PASS user add fake group fails
+  PASS user del A wrong group B fails
+  PASS user A survives wrong group del
+  PASS user del A with group A
+  PASS user A gone
+  PASS user del A idempotent
+  PASS group del A
+  PASS group del B
+
+[0015] membership lifecycle user namespace
+  PASS group add A
+  PASS group add B
+  PASS user add A in group A
+  PASS user A not in group B
+  PASS user add_group A B
+  PASS user A now in B
+  PASS user add_group A B idempotent
+  PASS user::groups A contains B
+  PASS group::users B contains A
+  PASS user del_group A B
+  PASS user A no longer in B
+  PASS user del_group A B idempotent
+  PASS add_group fake user fails
+  PASS add_group creates missing group C
+  PASS group C created by user::add_group
+  PASS user A in group C
+  PASS user del A
+  PASS group del A
+  PASS group del B
+  PASS group del C
+
+[0016] membership lifecycle group namespace strict
+  PASS group add A
+  PASS group add C
+  PASS user add B in group A
+  PASS group add_user C B
+  PASS user B in group C
+  PASS group add_user C B idempotent
+  PASS group add_user missing group fails
+  PASS group add_user missing user fails
+  PASS group add_user invalid group fails
+  PASS group add_user invalid user fails
+  PASS group del_user C B
+  PASS user B not in C
+  PASS group del_user C B idempotent
+  PASS group del_user missing group fails
+  PASS group del_user missing user fails
+  PASS user del B
+  PASS group del A
+  PASS group del C
+
+[0017] delete safety and idempotency
+  PASS user::del empty rejects
+  PASS user::del wildcard rejects
+  PASS user::del newline rejects
+  PASS user::del valid missing idempotent
+  PASS user::del valid missing with group fails
+  PASS group::del empty rejects
+  PASS group::del wildcard rejects
+  PASS group::del newline rejects
+  PASS group::del valid missing idempotent
+
+[0018] hostile input sweep
+  PASS user::exists hostile *
+  PASS user::id hostile *
+  PASS user::group hostile *
+  PASS user::home hostile *
+  PASS user::shell hostile *
+  PASS user::groups hostile *
+  PASS group::exists hostile *
+  PASS group::id hostile *
+  PASS group::users hostile *
+  PASS user::exists hostile ?
+  PASS user::id hostile ?
+  PASS user::group hostile ?
+  PASS user::home hostile ?
+  PASS user::shell hostile ?
+  PASS user::groups hostile ?
+  PASS group::exists hostile ?
+  PASS group::id hostile ?
+  PASS group::users hostile ?
+  PASS user::exists hostile [abc]
+  PASS user::id hostile [abc]
+  PASS user::group hostile [abc]
+  PASS user::home hostile [abc]
+  PASS user::shell hostile [abc]
+  PASS user::groups hostile [abc]
+  PASS group::exists hostile [abc]
+  PASS group::id hostile [abc]
+  PASS group::users hostile [abc]
+  PASS user::exists hostile bad/name
+  PASS user::id hostile bad/name
+  PASS user::group hostile bad/name
+  PASS user::home hostile bad/name
+  PASS user::shell hostile bad/name
+  PASS user::groups hostile bad/name
+  PASS group::exists hostile bad/name
+  PASS group::id hostile bad/name
+  PASS group::users hostile bad/name
+  PASS user::exists hostile bad\name
+  PASS user::id hostile bad\name
+  PASS user::group hostile bad\name
+  PASS user::home hostile bad\name
+  PASS user::shell hostile bad\name
+  PASS user::groups hostile bad\name
+  PASS group::exists hostile bad\name
+  PASS group::id hostile bad\name
+  PASS group::users hostile bad\name
+  PASS user::exists hostile $USER
+  PASS user::id hostile $USER
+  PASS user::group hostile $USER
+  PASS user::home hostile $USER
+  PASS user::shell hostile $USER
+  PASS user::groups hostile $USER
+  PASS group::exists hostile $USER
+  PASS group::id hostile $USER
+  PASS group::users hostile $USER
+  PASS user::exists hostile $(id)
+  PASS user::id hostile $(id)
+  PASS user::group hostile $(id)
+  PASS user::home hostile $(id)
+  PASS user::shell hostile $(id)
+  PASS user::groups hostile $(id)
+  PASS group::exists hostile $(id)
+  PASS group::id hostile $(id)
+  PASS group::users hostile $(id)
+  PASS user::exists hostile ;true
+  PASS user::id hostile ;true
+  PASS user::group hostile ;true
+  PASS user::home hostile ;true
+  PASS user::shell hostile ;true
+  PASS user::groups hostile ;true
+  PASS group::exists hostile ;true
+  PASS group::id hostile ;true
+  PASS group::users hostile ;true
+  PASS user::exists hostile x
+y
+  PASS user::id hostile x
+y
+  PASS user::group hostile x
+y
+  PASS user::home hostile x
+y
+  PASS user::shell hostile x
+y
+  PASS user::groups hostile x
+y
+  PASS group::exists hostile x
+y
+  PASS group::id hostile x
+y
+  PASS group::users hostile x
+y
+  PASS user::exists hostile x
+y
+  PASS user::id hostile x
+y
+  PASS user::group hostile x
+y
+  PASS user::home hostile x
+y
+  PASS user::shell hostile x
+y
+  PASS user::groups hostile x
+y
+  PASS group::exists hostile x
+y
+  PASS group::id hostile x
+y
+  PASS group::users hostile x
+y
+
+[0019] read stress
+  PASS stress user::name 1
+  PASS stress user::id 1
+  PASS stress user::group 1
+  PASS stress user::home 1
+  PASS stress user::shell 1
+  PASS stress user::all 1
+  PASS stress group::all 1
+  PASS stress user::name 2
+  PASS stress user::id 2
+  PASS stress user::group 2
+  PASS stress user::home 2
+  PASS stress user::shell 2
+  PASS stress user::all 2
+  PASS stress group::all 2
+  PASS stress user::name 3
+  PASS stress user::id 3
+  PASS stress user::group 3
+  PASS stress user::home 3
+  PASS stress user::shell 3
+  PASS stress user::all 3
+  PASS stress group::all 3
+  PASS stress user::name 4
+  PASS stress user::id 4
+  PASS stress user::group 4
+  PASS stress user::home 4
+  PASS stress user::shell 4
+  PASS stress user::all 4
+  PASS stress group::all 4
+  PASS stress user::name 5
+  PASS stress user::id 5
+  PASS stress user::group 5
+  PASS stress user::home 5
+  PASS stress user::shell 5
+  PASS stress user::all 5
+  PASS stress group::all 5
+  PASS stress user::name 6
+  PASS stress user::id 6
+  PASS stress user::group 6
+  PASS stress user::home 6
+  PASS stress user::shell 6
+  PASS stress user::all 6
+  PASS stress group::all 6
+  PASS stress user::name 7
+  PASS stress user::id 7
+  PASS stress user::group 7
+  PASS stress user::home 7
+  PASS stress user::shell 7
+  PASS stress user::all 7
+  PASS stress group::all 7
+  PASS stress user::name 8
+  PASS stress user::id 8
+  PASS stress user::group 8
+  PASS stress user::home 8
+  PASS stress user::shell 8
+  PASS stress user::all 8
+  PASS stress group::all 8
+  PASS stress user::name 9
+  PASS stress user::id 9
+  PASS stress user::group 9
+  PASS stress user::home 9
+  PASS stress user::shell 9
+  PASS stress user::all 9
+  PASS stress group::all 9
+  PASS stress user::name 10
+  PASS stress user::id 10
+  PASS stress user::group 10
+  PASS stress user::home 10
+  PASS stress user::shell 10
+  PASS stress user::all 10
+  PASS stress group::all 10
+  PASS stress user::name 11
+  PASS stress user::id 11
+  PASS stress user::group 11
+  PASS stress user::home 11
+  PASS stress user::shell 11
+  PASS stress user::all 11
+  PASS stress group::all 11
+  PASS stress user::name 12
+  PASS stress user::id 12
+  PASS stress user::group 12
+  PASS stress user::home 12
+  PASS stress user::shell 12
+  PASS stress user::all 12
+  PASS stress group::all 12
+  PASS stress user::name 13
+  PASS stress user::id 13
+  PASS stress user::group 13
+  PASS stress user::home 13
+  PASS stress user::shell 13
+  PASS stress user::all 13
+  PASS stress group::all 13
+  PASS stress user::name 14
+  PASS stress user::id 14
+  PASS stress user::group 14
+  PASS stress user::home 14
+  PASS stress user::shell 14
+  PASS stress user::all 14
+  PASS stress group::all 14
+  PASS stress user::name 15
+  PASS stress user::id 15
+  PASS stress user::group 15
+  PASS stress user::home 15
+  PASS stress user::shell 15
+  PASS stress user::all 15
+  PASS stress group::all 15
+  PASS stress user::name 16
+  PASS stress user::id 16
+  PASS stress user::group 16
+  PASS stress user::home 16
+  PASS stress user::shell 16
+  PASS stress user::all 16
+  PASS stress group::all 16
+  PASS stress user::name 17
+  PASS stress user::id 17
+  PASS stress user::group 17
+  PASS stress user::home 17
+  PASS stress user::shell 17
+  PASS stress user::all 17
+  PASS stress group::all 17
+  PASS stress user::name 18
+  PASS stress user::id 18
+  PASS stress user::group 18
+  PASS stress user::home 18
+  PASS stress user::shell 18
+  PASS stress user::all 18
+  PASS stress group::all 18
+  PASS stress user::name 19
+  PASS stress user::id 19
+  PASS stress user::group 19
+  PASS stress user::home 19
+  PASS stress user::shell 19
+  PASS stress user::all 19
+  PASS stress group::all 19
+  PASS stress user::name 20
+  PASS stress user::id 20
+  PASS stress user::group 20
+  PASS stress user::home 20
+  PASS stress user::shell 20
+  PASS stress user::all 20
+  PASS stress group::all 20
+  PASS stress user::name 21
+  PASS stress user::id 21
+  PASS stress user::group 21
+  PASS stress user::home 21
+  PASS stress user::shell 21
+  PASS stress user::all 21
+  PASS stress group::all 21
+  PASS stress user::name 22
+  PASS stress user::id 22
+  PASS stress user::group 22
+  PASS stress user::home 22
+  PASS stress user::shell 22
+  PASS stress user::all 22
+  PASS stress group::all 22
+  PASS stress user::name 23
+  PASS stress user::id 23
+  PASS stress user::group 23
+  PASS stress user::home 23
+  PASS stress user::shell 23
+  PASS stress user::all 23
+  PASS stress group::all 23
+  PASS stress user::name 24
+  PASS stress user::id 24
+  PASS stress user::group 24
+  PASS stress user::home 24
+  PASS stress user::shell 24
+  PASS stress user::all 24
+  PASS stress group::all 24
+  PASS stress user::name 25
+  PASS stress user::id 25
+  PASS stress user::group 25
+  PASS stress user::home 25
+  PASS stress user::shell 25
+  PASS stress user::all 25
+  PASS stress group::all 25
+  PASS stress user::name 26
+  PASS stress user::id 26
+  PASS stress user::group 26
+  PASS stress user::home 26
+  PASS stress user::shell 26
+  PASS stress user::all 26
+  PASS stress group::all 26
+  PASS stress user::name 27
+  PASS stress user::id 27
+  PASS stress user::group 27
+  PASS stress user::home 27
+  PASS stress user::shell 27
+  PASS stress user::all 27
+  PASS stress group::all 27
+  PASS stress user::name 28
+  PASS stress user::id 28
+  PASS stress user::group 28
+  PASS stress user::home 28
+  PASS stress user::shell 28
+  PASS stress user::all 28
+  PASS stress group::all 28
+  PASS stress user::name 29
+  PASS stress user::id 29
+  PASS stress user::group 29
+  PASS stress user::home 29
+  PASS stress user::shell 29
+  PASS stress user::all 29
+  PASS stress group::all 29
+  PASS stress user::name 30
+  PASS stress user::id 30
+  PASS stress user::group 30
+  PASS stress user::home 30
+  PASS stress user::shell 30
+  PASS stress user::all 30
+  PASS stress group::all 30
+
+[0020] final cleanup assertion
+  PASS final user A absent
+  PASS final user B absent
+  PASS final user C absent
+  PASS final group A absent
+  PASS final group B absent
+  PASS final group C absent
+
+============================================================
+ user.sh legendary production test summary
+============================================================
+Total sections : 20
+Pass           : 584
+Fail           : 0
+Skip           : 0
+Root           : /tmp/bashx-user-legendary.Y37HwO
+Prefix         : bx26506796
+============================================================
+
+[[ CI WINDOWS ]]
+
+3m 51s
 Run bash src/parts/builtin/test.sh
+[target] user.sh
+[env] os=windows runtime=gitbash user=runneradmin group=Administrators mutate=1
 
-[commands]
-sys::shell               = /usr/bin/bash
-sys::has bash            = 
-sys::which bash          = /usr/bin/bash
-sys::which_all bash      = /usr/bin/bash | /usr/bin/bash.exe | /bin/bash | /bin/bash.exe | /c/Windows/system32/bash | /c/Windows/system32/bash.exe | /usr/bin/bash | /usr/bin/bash.exe
+[0001] api presence
+  PASS function exists: user::valid
+  PASS function exists: user::id
+  PASS function exists: user::name
+  PASS function exists: user::exists
+  PASS function exists: user::add
+  PASS function exists: user::del
+  PASS function exists: user::all
+  PASS function exists: user::groups
+  PASS function exists: user::add_group
+  PASS function exists: user::del_group
+  PASS function exists: user::group
+  PASS function exists: user::home
+  PASS function exists: user::shell
+  PASS function exists: user::is_root
+  PASS function exists: user::is_admin
+  PASS function exists: user::can_sudo
+  PASS function exists: group::valid
+  PASS function exists: group::id
+  PASS function exists: group::name
+  PASS function exists: group::exists
+  PASS function exists: group::add
+  PASS function exists: group::del
+  PASS function exists: group::all
+  PASS function exists: group::users
+  PASS function exists: group::add_user
+  PASS function exists: group::del_user
 
-[platform]
-sys::name                = windows
-sys::runtime             = gitbash
-sys::kernel              = MINGW64_NT-10.0-26100
-sys::distro              = gitbash
-sys::pkg_manager         = winget
-sys::svc_manager         = sc
-sys::fw_manager          = windows-firewall
-sys::arch                = x64
-sys::version             = 10.0.26100.0
+[0002] validation API
+  PASS user::valid accepts runneradmin
+  PASS group::valid accepts runneradmin
+  PASS user::valid accepts Administrators
+  PASS group::valid accepts Administrators
+  PASS user::valid accepts bx97367526ua
+  PASS group::valid accepts bx97367526ua
+  PASS user::valid accepts bx97367526ga
+  PASS group::valid accepts bx97367526ga
+  PASS user::valid accepts abc_123
+  PASS group::valid accepts abc_123
+  PASS user::valid accepts abc-123
+  PASS group::valid accepts abc-123
+  PASS user::valid rejects hostile []
+  PASS group::valid rejects hostile []
+  PASS user::valid rejects hostile [*]
+  PASS group::valid rejects hostile [*]
+  PASS user::valid rejects hostile [?]
+  PASS group::valid rejects hostile [?]
+  PASS user::valid rejects hostile [[abc]]
+  PASS group::valid rejects hostile [[abc]]
+  PASS user::valid rejects hostile [bad/name]
+  PASS group::valid rejects hostile [bad/name]
+  PASS user::valid rejects hostile [bad\name]
+  PASS group::valid rejects hostile [bad\name]
+  PASS user::valid rejects hostile [bad
+name]
+  PASS group::valid rejects hostile [bad
+name]
+  PASS user::valid rejects hostile [bad
+name]
+  PASS group::valid rejects hostile [bad
+name]
 
-[env/constants]
-sys::path_sep            = ;
-sys::line_sep            = crlf
-sys::path_name           = Path
-sys::exe_suffix          = .exe
-sys::lib_suffix          = .dll
-sys::path_dirs           = /mingw64/bin | /usr/bin | /c/Users/runneradmin/bin | /c/Program Files/MongoDB/Server/7.0/bin | /c/vcpkg | /c/tools/zstd | /c/hostedtoolcache/windows/stack/3.9.3/x64 | /c/cabal/bin | /c/ghcup/bin | /c/mingw64/bin | /c/Program Files/dotnet | /c/Program Files/MySQL/MySQL Server 8.0/bin | /c/Program Files/R/R-4.5.3/bin/x64 | /c/SeleniumWebDrivers/GeckoDriver | /c/SeleniumWebDrivers/EdgeDriver | /c/SeleniumWebDrivers/ChromeDriver | /c/Program Files (x86)/sbt/bin | /c/Program Files (x86)/GitHub CLI | /bin | /c/Program Files (x86)/pipx_bin | /c/npm/prefix | /c/hostedtoolcache/windows/go/1.24.13/x64/bin | /c/hostedtoolcache/windows/Python/3.12.10/x64/Scripts | /c/hostedtoolcache/windows/Python/3.12.10/x64 | /c/hostedtoolcache/windows/Ruby/3.3.11/x64/bin | /c/Program Files/OpenSSL/bin | /c/tools/kotlinc/bin | /c/hostedtoolcache/windows/Java_Temurin-Hotspot_jdk/17.0.18-8/x64/bin | /c/Program Files/ImageMagick-7.1.2-Q16-HDRI | /c/Program Files/Microsoft SDKs/Azure/CLI2/wbin | /c/ProgramData/kind | /c/ProgramData/Chocolatey/bin | /c/Windows/system32 | /c/Windows | /c/Windows/System32/Wbem | /c/Windows/System32/WindowsPowerShell/v1.0 | /c/Windows/System32/OpenSSH | /c/Program Files/PowerShell/7 | /c/Program Files/Microsoft/Web Platform Installer | /c/Program Files/Microsoft SQL Server/Client SDK/ODBC/170/Tools/Binn | /c/Program Files/Microsoft SQL Server/150/Tools/Binn | /c/Program Files/dotnet | /c/Program Files (x86)/Windows Kits/10/Windows Performance Toolkit | /c/Program Files (x86)/WiX Toolset v3.14/bin | /c/Program Files/Microsoft SQL Server/130/DTS/Binn | /c/Program Files/Microsoft SQL Server/140/DTS/Binn | /c/Program Files/Microsoft SQL Server/150/DTS/Binn | /c/Program Files/Microsoft SQL Server/160/DTS/Binn | /c/Program Files/Microsoft SQL Server/170/DTS/Binn | /c/ProgramData/chocolatey/lib/pulumi/tools/Pulumi/bin | /c/Program Files/CMake/bin | /c/Strawberry/c/bin | /c/Strawberry/perl/site/bin | /c/Strawberry/perl/bin | /c/ProgramData/chocolatey/lib/maven/apache-maven-3.9.14/bin | /c/Program Files/Microsoft Service Fabric/bin/Fabric/Fabric.Code | /c/Program Files/Microsoft SDKs/Service Fabric/Tools/ServiceFabricLocalClusterManager | /c/Program Files/nodejs | /cmd | /mingw64/bin | /usr/bin | /c/Program Files/GitHub CLI | /c/tools/php | /c/Program Files (x86)/sbt/bin | /c/Program Files/Amazon/AWSCLIV2 | /c/Program Files/Amazon/SessionManagerPlugin/bin | /c/Program Files/Amazon/AWSSAMCLI/bin | /c/Program Files/Microsoft SQL Server/130/Tools/Binn | /c/Program Files/mongosh | /c/Program Files/LLVM/bin | /c/Program Files (x86)/LLVM/bin | /c/Users/runneradmin/.dotnet/tools | /c/Users/runneradmin/.cargo/bin | /c/Users/runneradmin/AppData/Local/Microsoft/WindowsApps
+[0003] current identity reads
+  PASS user::name nonempty
+  PASS user::id nonempty
+  PASS user::id numeric
+  PASS user::group nonempty
+  PASS group::name nonempty
+  PASS group::id nonempty
+  PASS group::id numeric
+  PASS user::home nonempty
+  PASS user::shell nonempty
+  PASS user::name no CR/LF
+  PASS group::name no CR/LF
 
-[identity]
-sys::hostname            = runnervmxu3fp
-sys::username            = runneradmin
-sys::pid                 = 1209
-sys::ppid                = 1208
-sys::umask               = 0022
-sys::locale              = en-US
-sys::timezone            = UTC
-sys::proxy               = 
-sys::ip                  = 172.24.240.1 | 10.1.0.114
+[0004] identity repeatability
+  PASS repeat user::name 1
+  PASS repeat user::id 1
+  PASS repeat user::group 1
+  PASS repeat group::id 1
+  PASS repeat user::name 2
+  PASS repeat user::id 2
+  PASS repeat user::group 2
+  PASS repeat group::id 2
+  PASS repeat user::name 3
+  PASS repeat user::id 3
+  PASS repeat user::group 3
+  PASS repeat group::id 3
+  PASS repeat user::name 4
+  PASS repeat user::id 4
+  PASS repeat user::group 4
+  PASS repeat group::id 4
+  PASS repeat user::name 5
+  PASS repeat user::id 5
+  PASS repeat user::group 5
+  PASS repeat group::id 5
+  PASS repeat user::name 6
+  PASS repeat user::id 6
+  PASS repeat user::group 6
+  PASS repeat group::id 6
+  PASS repeat user::name 7
+  PASS repeat user::id 7
+  PASS repeat user::group 7
+  PASS repeat group::id 7
+  PASS repeat user::name 8
+  PASS repeat user::id 8
+  PASS repeat user::group 8
+  PASS repeat group::id 8
+  PASS repeat user::name 9
+  PASS repeat user::id 9
+  PASS repeat user::group 9
+  PASS repeat group::id 9
+  PASS repeat user::name 10
+  PASS repeat user::id 10
+  PASS repeat user::group 10
+  PASS repeat group::id 10
+  PASS repeat user::name 11
+  PASS repeat user::id 11
+  PASS repeat user::group 11
+  PASS repeat group::id 11
+  PASS repeat user::name 12
+  PASS repeat user::id 12
+  PASS repeat user::group 12
+  PASS repeat group::id 12
 
-[ci/runtime flags]
-sys::ci_name             = github
-sys::is_ci               = 
-sys::is_ci_pull          = <failed:1>
-sys::is_ci_push          = 
-sys::is_ci_tag           = <failed:1>
-sys::is_linux            = <failed:1>
-sys::is_macos            = <failed:1>
-sys::is_windows          = 
-sys::is_wsl              = <failed:1>
-sys::is_msys             = 
-sys::is_gitbash          = 
-sys::is_cygwin           = <failed:1>
-sys::is_unix             = <failed:1>
-sys::is_posix            = 
-sys::is_gui              = <failed:1>
-sys::is_headless         = 
-sys::is_terminal         = <failed:1>
-sys::is_interactive      = <failed:1>
-sys::is_container        = <failed:1>
-sys::is_root             = 
-sys::is_admin            = 
-sys::can_sudo            = <failed:1>
+[0005] user::exists matrix
+  PASS current user exists
+  PASS current user in current group
+  PASS fake user missing
+  PASS fake user in current group missing
+  PASS current user in fake group missing
+  PASS user::exists rejects bad user []
+  PASS user::exists rejects bad user [*]
+  PASS user::exists rejects bad user [?]
+  PASS user::exists rejects bad user [[x]]
+  PASS user::exists rejects bad user [bad/name]
+  PASS user::exists rejects bad user [bad
+name]
+  PASS user::exists rejects bad user [bad
+name]
+  PASS user::exists rejects bad group [*]
+  PASS user::exists rejects bad group [?]
+  PASS user::exists rejects bad group [[x]]
+  PASS user::exists rejects bad group [bad/name]
+  PASS user::exists rejects bad group [bad
+group]
+  PASS user::exists rejects bad group [bad
+group]
 
-[time/load]
-sys::uptime              = 342
-sys::loadavg             = 1.66 1.66 1.66
+[0006] group::exists matrix
+  PASS current group exists
+  PASS fake group missing
+  PASS group::exists rejects bad group []
+  PASS group::exists rejects bad group [*]
+  PASS group::exists rejects bad group [?]
+  PASS group::exists rejects bad group [[x]]
+  PASS group::exists rejects bad group [bad/name]
+  PASS group::exists rejects bad group [bad
+group]
+  PASS group::exists rejects bad group [bad
+group]
 
-[disk]
-sys::disk_total .        = 161059172352
-sys::disk_free .         = 157864677376
-sys::disk_used .         = 3194494976
-sys::disk_percent .      = 1
-sys::disk_size .         = 735232
-sys::disk_info .         = path=. | total=161059172352 | free=157864677376 | used=3194494976 | percent=1
+[0007] id matrices
+  PASS implicit id equals explicit current
+  PASS fake user id fails
+  PASS implicit group id equals explicit current
+  PASS fake group id fails
+  PASS user::id rejects bad [*]
+  PASS group::id rejects bad [*]
+  PASS user::id rejects bad [?]
+  PASS group::id rejects bad [?]
+  PASS user::id rejects bad [[x]]
+  PASS group::id rejects bad [[x]]
+  PASS user::id rejects bad [bad/name]
+  PASS group::id rejects bad [bad/name]
+  PASS user::id rejects bad [bad
+x]
+  PASS group::id rejects bad [bad
+x]
+  PASS user::id rejects bad [bad
+x]
+  PASS group::id rejects bad [bad
+x]
 
-[memory]
-sys::mem_total           = 17174360064
-sys::mem_free            = 14110183424
-sys::mem_used            = 3064709120
-sys::mem_percent         = 17
-sys::mem_info            = total=17174360064 | free=14105010176 | used=3069349888 | percent=17
+[0008] list all users/groups
+  PASS user::all nonempty
+  PASS group::all nonempty
+  PASS user::all contains current user
+  PASS group::all contains current group
+  PASS user::all excludes fake user
+  PASS group::all excludes fake group
+  PASS user::all unique
+  PASS group::all unique
 
-[cpu]
-sys::cpu_threads         = 4
-sys::cpu_count           = 4
-sys::cpu_cores           = 2
-sys::cpu_model           = AMD EPYC 7763 64-Core Processor                
-sys::cpu_usage           = 5
-sys::cpu_idle            = 99
-sys::cpu_info            = model=AMD EPYC 7763 64-Core Processor                 | cores=2 | threads=4 | usage=3 | idle=97
+[0009] membership listing wrappers
+  PASS user::groups current nonempty
+  PASS group::users current nonempty
+  PASS user::groups contains current group
+  PASS group::users contains current user
+  PASS user::groups current equals group::all user
+  PASS group::users current equals user::all group
+  PASS user::groups fake user fails
+  PASS group::users fake group fails
+  PASS user::groups rejects wildcard
+  PASS group::users rejects wildcard
 
-[bash]
-sys::bash_version        = 5.2.37(1)-release
-sys::bash_major          = 5
-sys::bash_minor          = 2
-sys::bash_msrv 5         = 
-sys::find_bash 5         = /usr/bin/bash
+[0010] home and shell reads
+  PASS implicit home nonempty
+  PASS explicit home nonempty
+  PASS implicit explicit home stable
+  PASS implicit shell nonempty
+  PASS explicit shell nonempty
+  PASS implicit explicit shell stable
+  PASS fake user home fails
+  PASS fake user shell fails
 
-[done]
+[0011] privilege checks
+  PASS user::is_root true branch
+  PASS user::is_admin true branch
+  PASS user::can_sudo false branch
+  PASS is_root fake user fails
+  PASS is_admin fake user fails
+  PASS can_sudo fake user fails
+  PASS windows can_sudo false
 
-[[WSL]]
+[0012] pre-mutation clean state
+  PASS user A absent
+  PASS user B absent
+  PASS group A absent
+  PASS group B absent
+  PASS group C absent
 
-codingmaster@codingmstr:/var/www/projects/bashx$ bash src/parts/builtin/test.sh
+[0013] group lifecycle destructive
+  PASS group add A
+  PASS group exists A
+  PASS group add A idempotent
+  PASS group id A
+  PASS group::all contains A
+  PASS group add invalid empty
+  PASS group add invalid wildcard
+  PASS group add invalid newline
+  PASS group del A
+  PASS group A gone
+  PASS group del A idempotent
+  PASS group del invalid empty
+  PASS group del invalid wildcard
 
-[commands]
-sys::shell               = /usr/bin/bash
-sys::has bash            =
-sys::which bash          = /usr/bin/bash
-sys::which_all bash      = /usr/bin/bash | /bin/bash
+[0014] user create-only strict lifecycle
+  PASS group add A
+  PASS group add B
+  PASS user add A in group A
+  PASS user A exists
+  PASS user A in group A
+  PASS user add A group A idempotent
+  PASS user add A group B strict fails
+  PASS user A id
+  PASS user A group
+  PASS user A home
+  PASS user A shell
+  PASS user::all contains A
+  PASS group::users A contains user A
+  PASS user add invalid empty
+  PASS user add invalid wildcard
+  PASS user add invalid newline
+  PASS user add fake group fails
+  PASS user del A wrong group B fails
+  PASS user A survives wrong group del
+  PASS user del A with group A
+  PASS user A gone
+  PASS user del A idempotent
+  PASS group del A
+  PASS group del B
 
-[platform]
-sys::name                = linux
-sys::runtime             = wsl
-sys::kernel              = Linux
-sys::distro              = ubuntu
-sys::pkg_manager         = apt
-sys::svc_manager         = systemd
-sys::fw_manager          = ufw
-sys::arch                = x64
-sys::version             = 5.15.167.4-microsoft-standard-WSL2
+[0015] membership lifecycle user namespace
+  PASS group add A
+  PASS group add B
+  PASS user add A in group A
+  PASS user A not in group B
+  PASS user add_group A B
+  PASS user A now in B
+  PASS user add_group A B idempotent
+  PASS user::groups A contains B
+  PASS group::users B contains A
+  PASS user del_group A B
+  PASS user A no longer in B
+  PASS user del_group A B idempotent
+  PASS add_group fake user fails
+  PASS add_group creates missing group C
+  PASS group C created by user::add_group
+  PASS user A in group C
+  PASS user del A
+  PASS group del A
+  PASS group del B
+  PASS group del C
 
-[env/constants]
-sys::path_sep            = :
-sys::line_sep            = lf
-sys::path_name           = PATH
-sys::exe_suffix          =
-sys::lib_suffix          = .so
-sys::path_dirs           = /home/codingmaster/.local/bin | /home/codingmaster/.local/zig/current | /home/codingmaster/.sdkman/candidates/maven/current/bin | /home/codingmaster/.sdkman/candidates/gradle/current/bin | /home/codingmaster/.bun/bin | /home/codingmaster/.pixi/bin | /home/codingmaster/.local/bin | /home/codingmaster/.nvm/versions/node/v25.2.1/bin | /mnt/c/Users/codingmstr/AppData/Local/Programs/Microsoft VS Code/bin | /usr/local/go/bin | /home/codingmaster/.cargo/bin | /run/user/1000/fnm_multishells/1013_1777540944871/bin | /home/codingmaster/.local/share/fnm | /home/codingmaster/.grit/bin | /usr/local/sbin | /usr/local/bin | /usr/sbin | /usr/bin | /sbin | /bin | /usr/games | /usr/local/games | /usr/lib/wsl/lib | /snap/bin | /home/codingmaster/.dotnet/tools | /home/codingmaster/.local/bin | /opt/zig | /home/codingmaster/.local/bin
+[0016] membership lifecycle group namespace strict
+  PASS group add A
+  PASS group add C
+  PASS user add B in group A
+  PASS group add_user C B
+  PASS user B in group C
+  PASS group add_user C B idempotent
+  PASS group add_user missing group fails
+  PASS group add_user missing user fails
+  PASS group add_user invalid group fails
+  PASS group add_user invalid user fails
+  PASS group del_user C B
+  PASS user B not in C
+  PASS group del_user C B idempotent
+  PASS group del_user missing group fails
+  PASS group del_user missing user fails
+  PASS user del B
+  PASS group del A
+  PASS group del C
 
-[identity]
-sys::hostname            = codingmstr
-sys::username            = codingmaster
-sys::pid                 = 29649
-sys::ppid                = 979
-sys::umask               = 0022
-sys::locale              = C.UTF-8
-sys::timezone            = Africa/Cairo
-sys::proxy               =
-sys::ip                  = 172.21.76.34 172.17.0.1 192.168.58.1
+[0017] delete safety and idempotency
+  PASS user::del empty rejects
+  PASS user::del wildcard rejects
+  PASS user::del newline rejects
+  PASS user::del valid missing idempotent
+  PASS user::del valid missing with group fails
+  PASS group::del empty rejects
+  PASS group::del wildcard rejects
+  PASS group::del newline rejects
+  PASS group::del valid missing idempotent
 
-[ci/runtime flags]
-sys::ci_name             = <failed:1>
-sys::is_ci               = <failed:1>
-sys::is_ci_pull          = <failed:1>
-sys::is_ci_push          = <failed:1>
-sys::is_ci_tag           = <failed:1>
-sys::is_linux            =
-sys::is_macos            = <failed:1>
-sys::is_windows          = <failed:1>
-sys::is_wsl              =
-sys::is_msys             = <failed:1>
-sys::is_gitbash          = <failed:1>
-sys::is_cygwin           = <failed:1>
-sys::is_unix             =
-sys::is_posix            =
-sys::is_gui              =
-sys::is_headless         = <failed:1>
-sys::is_terminal         =
-sys::is_interactive      = <failed:1>
-sys::is_container        =
-sys::is_root             = <failed:1>
-sys::is_admin            =
-sys::can_sudo            = <failed:1>
+[0018] hostile input sweep
+  PASS user::exists hostile *
+  PASS user::id hostile *
+  PASS user::group hostile *
+  PASS user::home hostile *
+  PASS user::shell hostile *
+  PASS user::groups hostile *
+  PASS group::exists hostile *
+  PASS group::id hostile *
+  PASS group::users hostile *
+  PASS user::exists hostile ?
+  PASS user::id hostile ?
+  PASS user::group hostile ?
+  PASS user::home hostile ?
+  PASS user::shell hostile ?
+  PASS user::groups hostile ?
+  PASS group::exists hostile ?
+  PASS group::id hostile ?
+  PASS group::users hostile ?
+  PASS user::exists hostile [abc]
+  PASS user::id hostile [abc]
+  PASS user::group hostile [abc]
+  PASS user::home hostile [abc]
+  PASS user::shell hostile [abc]
+  PASS user::groups hostile [abc]
+  PASS group::exists hostile [abc]
+  PASS group::id hostile [abc]
+  PASS group::users hostile [abc]
+  PASS user::exists hostile bad/name
+  PASS user::id hostile bad/name
+  PASS user::group hostile bad/name
+  PASS user::home hostile bad/name
+  PASS user::shell hostile bad/name
+  PASS user::groups hostile bad/name
+  PASS group::exists hostile bad/name
+  PASS group::id hostile bad/name
+  PASS group::users hostile bad/name
+  PASS user::exists hostile bad\name
+  PASS user::id hostile bad\name
+  PASS user::group hostile bad\name
+  PASS user::home hostile bad\name
+  PASS user::shell hostile bad\name
+  PASS user::groups hostile bad\name
+  PASS group::exists hostile bad\name
+  PASS group::id hostile bad\name
+  PASS group::users hostile bad\name
+  PASS user::exists hostile $USER
+  PASS user::id hostile $USER
+  PASS user::group hostile $USER
+  PASS user::home hostile $USER
+  PASS user::shell hostile $USER
+  PASS user::groups hostile $USER
+  PASS group::exists hostile $USER
+  PASS group::id hostile $USER
+  PASS group::users hostile $USER
+  PASS user::exists hostile $(id)
+  PASS user::id hostile $(id)
+  PASS user::group hostile $(id)
+  PASS user::home hostile $(id)
+  PASS user::shell hostile $(id)
+  PASS user::groups hostile $(id)
+  PASS group::exists hostile $(id)
+  PASS group::id hostile $(id)
+  PASS group::users hostile $(id)
+  PASS user::exists hostile ;true
+  PASS user::id hostile ;true
+  PASS user::group hostile ;true
+  PASS user::home hostile ;true
+  PASS user::shell hostile ;true
+  PASS user::groups hostile ;true
+  PASS group::exists hostile ;true
+  PASS group::id hostile ;true
+  PASS group::users hostile ;true
+  PASS user::exists hostile x
+y
+  PASS user::id hostile x
+y
+  PASS user::group hostile x
+y
+  PASS user::home hostile x
+y
+  PASS user::shell hostile x
+y
+  PASS user::groups hostile x
+y
+  PASS group::exists hostile x
+y
+  PASS group::id hostile x
+y
+  PASS group::users hostile x
+y
+  PASS user::exists hostile x
+y
+  PASS user::id hostile x
+y
+  PASS user::group hostile x
+y
+  PASS user::home hostile x
+y
+  PASS user::shell hostile x
+y
+  PASS user::groups hostile x
+y
+  PASS group::exists hostile x
+y
+  PASS group::id hostile x
+y
+  PASS group::users hostile x
+y
 
-[time/load]
-sys::uptime              = 25348
-sys::loadavg             = 0.10 0.04 0.01
+[0019] read stress
+  PASS stress user::name 1
+  PASS stress user::id 1
+  PASS stress user::group 1
+  PASS stress user::home 1
+  PASS stress user::shell 1
+  PASS stress user::all 1
+  PASS stress group::all 1
+  PASS stress user::name 2
+  PASS stress user::id 2
+  PASS stress user::group 2
+  PASS stress user::home 2
+  PASS stress user::shell 2
+  PASS stress user::all 2
+  PASS stress group::all 2
+  PASS stress user::name 3
+  PASS stress user::id 3
+  PASS stress user::group 3
+  PASS stress user::home 3
+  PASS stress user::shell 3
+  PASS stress user::all 3
+  PASS stress group::all 3
+  PASS stress user::name 4
+  PASS stress user::id 4
+  PASS stress user::group 4
+  PASS stress user::home 4
+  PASS stress user::shell 4
+  PASS stress user::all 4
+  PASS stress group::all 4
+  PASS stress user::name 5
+  PASS stress user::id 5
+  PASS stress user::group 5
+  PASS stress user::home 5
+  PASS stress user::shell 5
+  PASS stress user::all 5
+  PASS stress group::all 5
+  PASS stress user::name 6
+  PASS stress user::id 6
+  PASS stress user::group 6
+  PASS stress user::home 6
+  PASS stress user::shell 6
+  PASS stress user::all 6
+  PASS stress group::all 6
+  PASS stress user::name 7
+  PASS stress user::id 7
+  PASS stress user::group 7
+  PASS stress user::home 7
+  PASS stress user::shell 7
+  PASS stress user::all 7
+  PASS stress group::all 7
+  PASS stress user::name 8
+  PASS stress user::id 8
+  PASS stress user::group 8
+  PASS stress user::home 8
+  PASS stress user::shell 8
+  PASS stress user::all 8
+  PASS stress group::all 8
+  PASS stress user::name 9
+  PASS stress user::id 9
+  PASS stress user::group 9
+  PASS stress user::home 9
+  PASS stress user::shell 9
+  PASS stress user::all 9
+  PASS stress group::all 9
+  PASS stress user::name 10
+  PASS stress user::id 10
+  PASS stress user::group 10
+  PASS stress user::home 10
+  PASS stress user::shell 10
+  PASS stress user::all 10
+  PASS stress group::all 10
+  PASS stress user::name 11
+  PASS stress user::id 11
+  PASS stress user::group 11
+  PASS stress user::home 11
+  PASS stress user::shell 11
+  PASS stress user::all 11
+  PASS stress group::all 11
+  PASS stress user::name 12
+  PASS stress user::id 12
+  PASS stress user::group 12
+  PASS stress user::home 12
+  PASS stress user::shell 12
+  PASS stress user::all 12
+  PASS stress group::all 12
+  PASS stress user::name 13
+  PASS stress user::id 13
+  PASS stress user::group 13
+  PASS stress user::home 13
+  PASS stress user::shell 13
+  PASS stress user::all 13
+  PASS stress group::all 13
+  PASS stress user::name 14
+  PASS stress user::id 14
+  PASS stress user::group 14
+  PASS stress user::home 14
+  PASS stress user::shell 14
+  PASS stress user::all 14
+  PASS stress group::all 14
+  PASS stress user::name 15
+  PASS stress user::id 15
+  PASS stress user::group 15
+  PASS stress user::home 15
+  PASS stress user::shell 15
+  PASS stress user::all 15
+  PASS stress group::all 15
+  PASS stress user::name 16
+  PASS stress user::id 16
+  PASS stress user::group 16
+  PASS stress user::home 16
+  PASS stress user::shell 16
+  PASS stress user::all 16
+  PASS stress group::all 16
+  PASS stress user::name 17
+  PASS stress user::id 17
+  PASS stress user::group 17
+  PASS stress user::home 17
+  PASS stress user::shell 17
+  PASS stress user::all 17
+  PASS stress group::all 17
+  PASS stress user::name 18
+  PASS stress user::id 18
+  PASS stress user::group 18
+  PASS stress user::home 18
+  PASS stress user::shell 18
+  PASS stress user::all 18
+  PASS stress group::all 18
+  PASS stress user::name 19
+  PASS stress user::id 19
+  PASS stress user::group 19
+  PASS stress user::home 19
+  PASS stress user::shell 19
+  PASS stress user::all 19
+  PASS stress group::all 19
+  PASS stress user::name 20
+  PASS stress user::id 20
+  PASS stress user::group 20
+  PASS stress user::home 20
+  PASS stress user::shell 20
+  PASS stress user::all 20
+  PASS stress group::all 20
+  PASS stress user::name 21
+  PASS stress user::id 21
+  PASS stress user::group 21
+  PASS stress user::home 21
+  PASS stress user::shell 21
+  PASS stress user::all 21
+  PASS stress group::all 21
+  PASS stress user::name 22
+  PASS stress user::id 22
+  PASS stress user::group 22
+  PASS stress user::home 22
+  PASS stress user::shell 22
+  PASS stress user::all 22
+  PASS stress group::all 22
+  PASS stress user::name 23
+  PASS stress user::id 23
+  PASS stress user::group 23
+  PASS stress user::home 23
+  PASS stress user::shell 23
+  PASS stress user::all 23
+  PASS stress group::all 23
+  PASS stress user::name 24
+  PASS stress user::id 24
+  PASS stress user::group 24
+  PASS stress user::home 24
+  PASS stress user::shell 24
+  PASS stress user::all 24
+  PASS stress group::all 24
+  PASS stress user::name 25
+  PASS stress user::id 25
+  PASS stress user::group 25
+  PASS stress user::home 25
+  PASS stress user::shell 25
+  PASS stress user::all 25
+  PASS stress group::all 25
+  PASS stress user::name 26
+  PASS stress user::id 26
+  PASS stress user::group 26
+  PASS stress user::home 26
+  PASS stress user::shell 26
+  PASS stress user::all 26
+  PASS stress group::all 26
+  PASS stress user::name 27
+  PASS stress user::id 27
+  PASS stress user::group 27
+  PASS stress user::home 27
+  PASS stress user::shell 27
+  PASS stress user::all 27
+  PASS stress group::all 27
+  PASS stress user::name 28
+  PASS stress user::id 28
+  PASS stress user::group 28
+  PASS stress user::home 28
+  PASS stress user::shell 28
+  PASS stress user::all 28
+  PASS stress group::all 28
+  PASS stress user::name 29
+  PASS stress user::id 29
+  PASS stress user::group 29
+  PASS stress user::home 29
+  PASS stress user::shell 29
+  PASS stress user::all 29
+  PASS stress group::all 29
+  PASS stress user::name 30
+  PASS stress user::id 30
+  PASS stress user::group 30
+  PASS stress user::home 30
+  PASS stress user::shell 30
+  PASS stress user::all 30
+  PASS stress group::all 30
 
-[disk]
-sys::disk_total .        = 1081101176832
-sys::disk_free .         = 974579253248
-sys::disk_used .         = 106521923584
-sys::disk_percent .      = 9
-sys::disk_size .         = 3227648
-sys::disk_info .         = path=. | total=1081101176832 | free=974579253248 | used=106521923584 | percent=9
+[0020] final cleanup assertion
+  PASS final user A absent
+  PASS final user B absent
+  PASS final user C absent
+  PASS final group A absent
+  PASS final group B absent
+  PASS final group C absent
 
-[memory]
-sys::mem_total           = 6218076160
-sys::mem_free            = 4974641152
-sys::mem_used            = 1244205056
-sys::mem_percent         = 20
-sys::mem_info            = total=6218076160 | free=4973371392 | used=1244704768 | percent=20
-
-[cpu]
-sys::cpu_threads         = 8
-sys::cpu_count           = 8
-sys::cpu_cores           = 4
-sys::cpu_model           = Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
-sys::cpu_usage           = 0
-sys::cpu_idle            = 100
-sys::cpu_info            = model=Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz | cores=4 | threads=8 | usage=2 | idle=98
-
-[bash]
-sys::bash_version        = 5.2.21(1)-release
-sys::bash_major          = 5
-sys::bash_minor          = 2
-sys::bash_msrv 5         =
-sys::find_bash 5         = /usr/bin/bash
-
-[done]
-codingmaster@codingmstr:/var/www/projects/bashx$
-
-[[MSYS2]]
-
-codingmaster@codingmstr MINGW64 //wsl$/Ubuntu/var/www/projects/bashx
-$ bash src/parts/builtin/test.sh
-
-[commands]
-sys::shell               = /usr/bin/bash
-sys::has bash            =
-sys::which bash          = /usr/bin/bash
-sys::which_all bash      = /usr/bin/bash | /usr/bin/bash.exe | /bin/bash | /bin/bash.exe | /c/Windows/System32/bash | /c/Windows/System32/bash.exe
-
-[platform]
-sys::name                = windows
-sys::runtime             = msys2
-sys::kernel              = MINGW64_NT-10.0-22621
-sys::distro              = msys2
-sys::pkg_manager         = pacman
-sys::svc_manager         = sc
-sys::fw_manager          = windows-firewall
-sys::arch                = x64
-sys::version             = 10.0.22621.0
-
-[env/constants]
-sys::path_sep            = ;
-sys::line_sep            = crlf
-sys::path_name           = Path
-sys::exe_suffix          = .exe
-sys::lib_suffix          = .dll
-sys::path_dirs           = /c/Program Files/dotnet | /c/Users/codingmstr/.bun/bin | /c/Program Files/dotnet | /c/Users/codingmstr/.bun/bin | /mingw64/bin | /usr/local/bin | /usr/bin | /bin | /c/Windows/System32 | /c/Windows | /c/Windows/System32/Wbem | /c/Windows/System32/WindowsPowerShell/v1.0/ | /usr/bin/site_perl | /usr/bin/vendor_perl | /usr/bin/core_perl
-
-[identity]
-sys::hostname            = codingmstr
-sys::username            = codingmaster
-sys::pid                 = 5138
-sys::ppid                = 1878
-sys::umask               = 0022
-sys::locale              = en_US.UTF-8
-sys::timezone            = Africa/Cairo
-sys::proxy               =
-sys::ip                  = 172.21.64.1 | 192.168.1.6
-
-[ci/runtime flags]
-sys::ci_name             = <failed:1>
-sys::is_ci               = <failed:1>
-sys::is_ci_pull          = <failed:1>
-sys::is_ci_push          = <failed:1>
-sys::is_ci_tag           = <failed:1>
-sys::is_linux            = <failed:1>
-sys::is_macos            = <failed:1>
-sys::is_windows          =
-sys::is_wsl              = <failed:1>
-sys::is_msys             =
-sys::is_gitbash          = <failed:1>
-sys::is_cygwin           =
-sys::is_unix             = <failed:1>
-sys::is_posix            =
-sys::is_gui              =
-sys::is_headless         = <failed:1>
-sys::is_terminal         =
-sys::is_interactive      = <failed:1>
-sys::is_container        = <failed:1>
-sys::is_root             = <failed:1>
-sys::is_admin            = <failed:1>
-sys::can_sudo            = <failed:1>
-
-[time/load]
-sys::uptime              = 25634
-sys::loadavg             = 0.76 0.73 0.62
-
-[disk]
-sys::disk_total .        = 1081101176832
-sys::disk_free .         = 974579208192
-sys::disk_used .         = 106521968640
-sys::disk_percent .      = 9
-sys::disk_size .         = 2375680
-sys::disk_info .         = path=. | total=1081101176832 | free=974579240960 | used=106521935872 | percent=9
-
-[memory]
-sys::mem_total           = 8417361920
-sys::mem_free            = 752545792
-sys::mem_used            = 7601967104
-sys::mem_percent         = 93
-sys::mem_info            = total=8417361920 | free=564879360 | used=7852482560 | percent=93
-
-[cpu]
-sys::cpu_threads         = 8
-sys::cpu_count           = 8
-sys::cpu_cores           = 4
-sys::cpu_model           = Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
-sys::cpu_usage           = 49
-sys::cpu_idle            = 79
-sys::cpu_info            = model=Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz | cores=4 | threads=8 | usage=4 | idle=96
-
-[bash]
-sys::bash_version        = 5.3.9(1)-release
-sys::bash_major          = 5
-sys::bash_minor          = 3
-sys::bash_msrv 5         =
-sys::find_bash 5         = /usr/bin/bash
-
-[done]
-
-codingmaster@codingmstr MINGW64 //wsl$/Ubuntu/var/www/projects/bashx
-
-[[GITBASH]]
-
-codingmaster@codingmstr MINGW64 //wsl$/Ubuntu/var/www/projects/bashx
-$ bash src/parts/builtin/test.sh
-
-[commands]
-sys::shell               = /usr/bin/bash
-sys::has bash            =
-sys::which bash          = /usr/bin/bash
-sys::which_all bash      = /usr/bin/bash | /usr/bin/bash.exe | /bin/bash | /bin/bash.exe | /usr/bin/bash | /usr/bin/bash.exe | /c/Windows/system32/bash | /c/Windows/system32/bash.exe | /bin/bash | /bin/bash.exe | /c/Users/codingmstr/AppData/Local/Microsoft/WindowsApps/bash | /c/Users/codingmstr/AppData/Local/Microsoft/WindowsApps/bash.exe
-
-[platform]
-sys::name                = windows
-sys::runtime             = gitbash
-sys::kernel              = MINGW64_NT-10.0-22621
-sys::distro              = gitbash
-sys::pkg_manager         = winget
-sys::svc_manager         = sc
-sys::fw_manager          = windows-firewall
-sys::arch                = x64
-sys::version             = 10.0.22621.0
-
-[env/constants]
-sys::path_sep            = ;
-sys::line_sep            = crlf
-sys::path_name           = Path
-sys::exe_suffix          = .exe
-sys::lib_suffix          = .dll
-sys::path_dirs           = /c/Users/codingmstr/bin | /mingw64/bin | /usr/local/bin | /usr/bin | /bin | /mingw64/bin | /usr/bin | /c/Users/codingmstr/bin | /c/Program Files/ImageMagick-7.1.1-Q16-HDRI | /c/Windows/system32 | /c/Windows | /c/Windows/System32/Wbem | /c/Windows/System32/WindowsPowerShell/v1.0 | /c/Windows/System32/OpenSSH | /c/Program Files/cmder | /cmd | /bin | /c/ProgramData/ComposerSetup/bin | /c/Program Files/Docker/Docker/resources/bin | /c/Program Files/MySQL/MySQL Server 9.1/bin | /c/Program Files/MATLAB/R2024b/bin | /c/Program Files (x86)/Windows Kits/10/Windows Performance Toolkit | /c/Program Files/redis | /c/Program Files/ffmpeg/bin | /c/Program Files/ngrok | /c/Program Files/WinRAR | /c/Program Files/nodejs | /c/Program Files/GitHub CLI | /c/Program Files/dotnet | /c/Users/codingmstr/.cargo/bin | /c/Users/codingmstr/AppData/Local/Programs/Python/Python312/Scripts | /c/Users/codingmstr/AppData/Local/Programs/Python/Python312 | /c/Users/codingmstr/AppData/Local/Microsoft/WindowsApps | /c/Users/codingmstr/AppData/Roaming/Composer/vendor/bin | /c/Program Files/php-8.3.9 | /c/Program Files/JetBrains/PyCharm 2024.3/bin | /c/Program Files/flutter/bin | /c/Users/codingmstr/AppData/Roaming/npm | /c/Users/codingmstr/AppData/Local/Programs/Microsoft VS Code/bin | /c/Users/codingmstr/AppData/Local/Programs/bin | /c/Users/codingmstr/.bun/bin | /c/Users/codingmstr/.dotnet/tools | /usr/bin/vendor_perl | /usr/bin/core_perl
-
-[identity]
-sys::hostname            = codingmstr
-sys::username            = codingmaster
-sys::pid                 = 3230
-sys::ppid                = 40
-sys::umask               = 0022
-sys::locale              = en_US.UTF-8
-sys::timezone            = Egypt Standard Time
-sys::proxy               =
-sys::ip                  = 172.21.64.1 | 192.168.1.6
-
-[ci/runtime flags]
-sys::ci_name             = <failed:1>
-sys::is_ci               = <failed:1>
-sys::is_ci_pull          = <failed:1>
-sys::is_ci_push          = <failed:1>
-sys::is_ci_tag           = <failed:1>
-sys::is_linux            = <failed:1>
-sys::is_macos            = <failed:1>
-sys::is_windows          =
-sys::is_wsl              = <failed:1>
-sys::is_msys             =
-sys::is_gitbash          =
-sys::is_cygwin           = <failed:1>
-sys::is_unix             = <failed:1>
-sys::is_posix            =
-sys::is_gui              =
-sys::is_headless         = <failed:1>
-sys::is_terminal         =
-sys::is_interactive      = <failed:1>
-sys::is_container        = <failed:1>
-sys::is_root             = <failed:1>
-sys::is_admin            = <failed:1>
-sys::can_sudo            = <failed:1>
-
-[time/load]
-sys::uptime              = 25634
-sys::loadavg             = 0.00 0.00 0.00
-
-[disk]
-sys::disk_total .        = 1081101176832
-sys::disk_free .         = 974579224576
-sys::disk_used .         = 106521952256
-sys::disk_percent .      = 9
-sys::disk_size .         = 2375680
-sys::disk_info .         = path=. | total=1081101176832 | free=974579240960 | used=106521935872 | percent=9
-
-[memory]
-sys::mem_total           = 8417361920
-sys::mem_free            = 553963520
-sys::mem_used            = 7818080256
-sys::mem_percent         = 91
-sys::mem_info            = total=8417361920 | free=696201216 | used=7721160704 | percent=91
-
-[cpu]
-sys::cpu_threads         = 8
-sys::cpu_count           = 8
-sys::cpu_cores           = 4
-sys::cpu_model           = Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz
-sys::cpu_usage           = 9
-sys::cpu_idle            = 94
-sys::cpu_info            = model=Intel(R) Core(TM) i5-10210U CPU @ 1.60GHz | cores=4 | threads=8 | usage=7 | idle=93
-
-[bash]
-sys::bash_version        = 5.2.26(1)-release
-sys::bash_major          = 5
-sys::bash_minor          = 2
-sys::bash_msrv 5         =
-sys::find_bash 5         = /usr/bin/bash
-
-[done]
-
-codingmaster@codingmstr MINGW64 //wsl$/Ubuntu/var/www/projects/bashx
+============================================================
+ user.sh legendary production test summary
+============================================================
+Total sections : 20
+Pass           : 584
+Fail           : 0
+Skip           : 0
+Root           : /tmp/bashx-user-legendary.XGOMFu
+Prefix         : bx97367526
+============================================================
