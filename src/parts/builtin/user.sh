@@ -635,10 +635,9 @@ user::shell () {
     [[ -n "${user}" ]] || user="${current}"
     [[ -n "${user}" ]] || return 1
 
-    if [[ "${user}" == "${current}" && -n "${SHELL:-}" ]]; then
-        printf '%s\n' "${SHELL}"
-        return 0
-    fi
+    user::exists "${user}" || return 1
+    [[ "${user}" == "${current}" && -n "${SHELL:-}" ]] && { printf '%s\n' "${SHELL}"; return 0; }
+        
     if sys::is_linux; then
 
         if sys::has getent; then
@@ -670,11 +669,12 @@ user::shell () {
             printf '%s\n' "${COMSPEC}"
             return 0
         fi
-        if sys::has powershell.exe; then
 
+        [[ "${user}" == "${current}" ]] || return 1
+
+        if sys::has powershell.exe; then
             v="$(powershell.exe -NoProfile -NonInteractive -Command "(Get-Command powershell.exe).Source" 2>/dev/null | tr -d '\r' || true)"
             [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
-
         fi
 
         return 1
