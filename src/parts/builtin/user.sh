@@ -644,88 +644,77 @@ user::del_group () {
 
 }
 
-user::shell () {
+user::home () {
 
     local user="${1:-}" current="" v=""
 
     [[ "${user}" != *$'\n'* && "${user}" != *$'\r'* ]] || return 1
-
     current="$(user::name 2>/dev/null || true)"
 
     [[ -n "${user}" ]] || user="${current}"
     [[ -n "${user}" ]] || return 1
 
     user::exists "${user}" || return 1
-    [[ "${user}" == "${current}" && -n "${SHELL:-}" ]] && { printf '%s\n' "${SHELL}"; return 0; }
-        
-    if sys::is_linux; then
 
-        if sys::has getent; then
-            v="$(getent passwd "${user}" 2>/dev/null | awk -F: 'NR == 1 { print $7 }')"
-            [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
-        fi
-
-        [[ -r /etc/passwd ]] || return 1
-
-        v="$(awk -F: -v u="${user}" '$1 == u { print $7; exit }' /etc/passwd 2>/dev/null)"
-        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
-
-        return 1
-
-    fi
-    if sys::is_macos; then
-
-        sys::has dscl || return 1
-
-        v="$(dscl . -read "/Users/${user}" UserShell 2>/dev/null | awk 'NR == 1 { print $2 }')"
-        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
-
-        return 1
-
-    fi
     if sys::is_windows; then
 
-        if [[ "${user}" == "${current}" && -n "${COMSPEC:-}" ]]; then
-            printf '%s\n' "${COMSPEC}"
-            return 0
+        if [[ "${user}" == "${current}" ]]; then
+
+            [[ -n "${HOME:-}" ]]        && { printf '%s\n' "${HOME}"; return 0; }
+            [[ -n "${USERPROFILE:-}" ]] && { printf '%s\n' "${USERPROFILE}"; return 0; }
+
         fi
-
-        [[ "${user}" == "${current}" ]] || return 1
-
         if sys::has powershell.exe; then
-            v="$(powershell.exe -NoProfile -NonInteractive -Command "(Get-Command powershell.exe).Source" 2>/dev/null | tr -d '\r' || true)"
+
+            if [[ "${user}" == "${current}" ]]; then
+
+                v="$(powershell.exe -NoProfile -NonInteractive -Command "[Environment]::GetFolderPath('UserProfile')" 2>/dev/null | tr -d '\r' | head -n 1 || true)"
+
+            else
+
+                # shellcheck disable=SC2016
+                v="$(SYS_USER_QUERY="${user}" powershell.exe -NoProfile -NonInteractive -Command '
+                    try {
+                        $name = $env:SYS_USER_QUERY
+                        $u = Get-LocalUser -Name $name -ErrorAction Stop
+                        $sid = $u.SID.Value
+                        $reg = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid"
+
+                        try {
+                            $p = ( Get-ItemProperty -Path $reg -ErrorAction Stop ).ProfileImagePath
+                            if ( $p ) { $p; exit 0 }
+                        } catch {}
+
+                        $base = $env:SystemDrive
+                        if ( -not $base ) { $base = "C:" }
+
+                        "$base\Users\$name"
+                        exit 0
+                    } catch {
+                        exit 1
+                    }
+                ' 2>/dev/null | tr -d '\r' | head -n 1 || true)"
+
+            fi
+
             [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
         fi
 
         return 1
 
     fi
-
-    return 1
-
-}
-user::home () {
-
-    local user="${1:-}" current="" v=""
-
-    [[ "${user}" != *$'\n'* && "${user}" != *$'\r'* ]] || return 1
-
-    current="$(user::name 2>/dev/null || true)"
-
-    [[ -n "${user}" ]] || user="${current}"
-    [[ -n "${user}" ]] || return 1
-
-    if [[ "${user}" == "${current}" ]]; then
-
-        [[ -n "${HOME:-}" ]] && { printf '%s\n' "${HOME}"; return 0; }
-        [[ -n "${USERPROFILE:-}" ]] && sys::is_windows && { printf '%s\n' "${USERPROFILE}"; return 0; }
-
+    if [[ "${user}" == "${current}" && -n "${HOME:-}" ]]; then
+        printf '%s\n' "${HOME}"
+        return 0
     fi
-    if sys::is_linux; then
+    if sys::is_linux || sys::is_wsl; then
 
         if sys::has getent; then
+
             v="$(getent passwd "${user}" 2>/dev/null | awk -F: 'NR == 1 { print $6 }')"
             [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
         fi
 
         [[ -r /etc/passwd ]] || return 1
@@ -746,42 +735,68 @@ user::home () {
         return 1
 
     fi
+
+    return 1
+
+}
+user::shell () {
+
+    local user="${1:-}" current="" v=""
+
+    [[ "${user}" != *$'\n'* && "${user}" != *$'\r'* ]] || return 1
+    current="$(user::name 2>/dev/null || true)"
+
+    [[ -n "${user}" ]] || user="${current}"
+    [[ -n "${user}" ]] || return 1
+
+    user::exists "${user}" || return 1
+
     if sys::is_windows; then
 
+        if [[ "${user}" == "${current}" && -n "${COMSPEC:-}" ]]; then
+            printf '%s\n' "${COMSPEC}"
+            return 0
+        fi
         if sys::has powershell.exe; then
 
-            if [[ "${user}" == "${current}" ]]; then
-
-                v="$(powershell.exe -NoProfile -NonInteractive -Command "[Environment]::GetFolderPath('UserProfile')" 2>/dev/null | tr -d '\r' || true)"
-
-            else
-
-                # shellcheck disable=SC2016
-                v="$(SYS_USER_QUERY="${user}" powershell.exe -NoProfile -NonInteractive -Command '
-                    try {
-                        $u = Get-LocalUser -Name $env:SYS_USER_QUERY -ErrorAction Stop
-                        $sid = $u.SID.Value
-                        $p = "Registry::HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\$sid"
-
-                        try {
-                            $home = ( Get-ItemProperty -Path $p -ErrorAction Stop ).ProfileImagePath
-                            if ( $home ) { $home; exit 0 }
-                        } catch {}
-
-                        $base = $env:SystemDrive + "\Users\"
-                        $path = $base + $env:SYS_USER_QUERY
-                        $path
-                        exit 0
-                    } catch {
-                        exit 1
-                    }
-                ' 2>/dev/null | tr -d '\r' || true)"
-
-            fi
-
+            v="$(powershell.exe -NoProfile -NonInteractive -Command "(Get-Command powershell.exe).Source" 2>/dev/null | tr -d '\r' | head -n 1 || true)"
             [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
 
         fi
+
+        [[ -n "${COMSPEC:-}" ]] && { printf '%s\n' "${COMSPEC}"; return 0; }
+
+        printf '%s\n' "powershell.exe"
+        return 0
+
+    fi
+    if [[ "${user}" == "${current}" && -n "${SHELL:-}" ]]; then
+        printf '%s\n' "${SHELL}"
+        return 0
+    fi
+    if sys::is_linux || sys::is_wsl; then
+
+        if sys::has getent; then
+
+            v="$(getent passwd "${user}" 2>/dev/null | awk -F: 'NR == 1 { print $7 }')"
+            [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+        fi
+
+        [[ -r /etc/passwd ]] || return 1
+
+        v="$(awk -F: -v u="${user}" '$1 == u { print $7; exit }' /etc/passwd 2>/dev/null)"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
+
+        return 1
+
+    fi
+    if sys::is_macos; then
+
+        sys::has dscl || return 1
+
+        v="$(dscl . -read "/Users/${user}" UserShell 2>/dev/null | awk 'NR == 1 { print $2 }')"
+        [[ -n "${v}" ]] && { printf '%s\n' "${v}"; return 0; }
 
         return 1
 
