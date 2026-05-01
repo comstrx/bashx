@@ -188,6 +188,8 @@ perm::set () {
             ;;
         esac
 
+        return 1
+
     fi
 
     sys::has chmod || return 1
@@ -339,8 +341,14 @@ perm::read () {
 
             if [[ -n "${user}" ]]; then
                 case "${who}" in
-                    *a*|*g*|*o*) icacls.exe "${winpath}" /grant "*S-1-5-32-545:(R)" >/dev/null 2>&1 && ok=0 ;;
-                    *)           icacls.exe "${winpath}" /grant "${user}:(R)" >/dev/null 2>&1 && ok=0 ;;
+                    *a*|*g*|*o*)
+                        icacls.exe "${winpath}" /remove:d "*S-1-5-32-545" >/dev/null 2>&1 || true
+                        icacls.exe "${winpath}" /grant "*S-1-5-32-545:(R)" >/dev/null 2>&1 && ok=0
+                    ;;
+                    *)
+                        icacls.exe "${winpath}" /remove:d "${user}" >/dev/null 2>&1 || true
+                        icacls.exe "${winpath}" /grant "${user}:(R)" >/dev/null 2>&1 && ok=0
+                    ;;
                 esac
             fi
 
@@ -376,8 +384,14 @@ perm::write () {
 
             if [[ -n "${user}" ]]; then
                 case "${who}" in
-                    *a*|*g*|*o*) icacls.exe "${winpath}" /grant "*S-1-5-32-545:(W)" >/dev/null 2>&1 && ok=0 ;;
-                    *)           icacls.exe "${winpath}" /grant "${user}:(W)" >/dev/null 2>&1 && ok=0 ;;
+                    *a*|*g*|*o*)
+                        icacls.exe "${winpath}" /remove:d "*S-1-5-32-545" >/dev/null 2>&1 || true
+                        icacls.exe "${winpath}" /grant "*S-1-5-32-545:(W)" >/dev/null 2>&1 && ok=0
+                    ;;
+                    *)
+                        icacls.exe "${winpath}" /remove:d "${user}" >/dev/null 2>&1 || true
+                        icacls.exe "${winpath}" /grant "${user}:(W)" >/dev/null 2>&1 && ok=0
+                    ;;
                 esac
             fi
 
@@ -413,8 +427,14 @@ perm::execute () {
 
             if [[ -n "${user}" ]]; then
                 case "${who}" in
-                    *a*|*g*|*o*) icacls.exe "${winpath}" /grant "*S-1-5-32-545:(RX)" >/dev/null 2>&1 && ok=0 ;;
-                    *)           icacls.exe "${winpath}" /grant "${user}:(RX)" >/dev/null 2>&1 && ok=0 ;;
+                    *a*|*g*|*o*)
+                        icacls.exe "${winpath}" /remove:d "*S-1-5-32-545" >/dev/null 2>&1 || true
+                        icacls.exe "${winpath}" /grant "*S-1-5-32-545:(RX)" >/dev/null 2>&1 && ok=0
+                    ;;
+                    *)
+                        icacls.exe "${winpath}" /remove:d "${user}" >/dev/null 2>&1 || true
+                        icacls.exe "${winpath}" /grant "${user}:(RX)" >/dev/null 2>&1 && ok=0
+                    ;;
                 esac
             fi
 
@@ -567,25 +587,55 @@ perm::group () {
 
 perm::readable () {
 
-    local path="${1:-}"
+    local path="${1:-}" mode=""
 
     [[ -n "${path}" ]] || return 1
+    [[ -e "${path}" || -L "${path}" ]] || return 1
+
+    if sys::is_windows; then
+
+        mode="$(perm::get "${path}" 2>/dev/null || true)"
+        [[ "${mode}" =~ ^[4567][0-7][0-7]$ ]]
+        return
+
+    fi
+
     [[ -r "${path}" ]]
 
 }
 perm::writable () {
 
-    local path="${1:-}"
+    local path="${1:-}" mode=""
 
     [[ -n "${path}" ]] || return 1
+    [[ -e "${path}" || -L "${path}" ]] || return 1
+
+    if sys::is_windows; then
+
+        mode="$(perm::get "${path}" 2>/dev/null || true)"
+        [[ "${mode}" =~ ^[2367][0-7][0-7]$ ]]
+        return
+
+    fi
+
     [[ -w "${path}" ]]
 
 }
 perm::executable () {
 
-    local path="${1:-}"
+    local path="${1:-}" mode=""
 
     [[ -n "${path}" ]] || return 1
+    [[ -e "${path}" || -L "${path}" ]] || return 1
+
+    if sys::is_windows; then
+
+        mode="$(perm::get "${path}" 2>/dev/null || true)"
+        [[ "${mode}" =~ ^[1357][0-7][0-7]$ ]]
+        return
+
+    fi
+
     [[ -x "${path}" ]]
 
 }
