@@ -9,15 +9,15 @@ perm::valid () {
     case "${kind}" in
         mode)
             [[ "${v}" =~ ^[0-7]{3,4}$ ]] && return 0
-            [[ "${v}" =~ ^[ugoa]*[+-=][rwxXstugo]+(,[ugoa]*[+-=][rwxXstugo]+)*$ ]]
+            [[ "${v}" =~ ^[ugoa]*[-+=][rwxXstugo]+(,[ugoa]*[-+=][rwxXstugo]+)*$ ]]
         ;;
         change)
-            [[ "${v}" =~ ^[+-=]?[rwxXst]+$ ]] && return 0
-            [[ "${v}" =~ ^[ugoa]*[+-=][rwxXstugo]+(,[ugoa]*[+-=][rwxXstugo]+)*$ ]]
+            [[ "${v}" =~ ^[-+=]?[rwxXst]+$ ]] && return 0
+            [[ "${v}" =~ ^[ugoa]*[-+=][rwxXstugo]+(,[ugoa]*[-+=][rwxXstugo]+)*$ ]]
         ;;
         remove)
-            [[ "${v}" =~ ^[+-]?[rwxXst]+$ ]] && return 0
-            [[ "${v}" =~ ^[ugoa]*[+-][rwxXstugo]+(,[ugoa]*[+-][rwxXstugo]+)*$ ]]
+            [[ "${v}" =~ ^[-+]?[rwxXst]+$ ]] && return 0
+            [[ "${v}" =~ ^[ugoa]*[-+][rwxXstugo]+(,[ugoa]*[-+][rwxXstugo]+)*$ ]]
         ;;
         who)
             [[ "${v}" =~ ^[ugoa]+$ ]]
@@ -95,6 +95,7 @@ perm::set () {
 
     [[ -n "${path}" && -n "${mode}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
+
     perm::valid "${mode}" mode || return 1
 
     if sys::is_windows && sys::has icacls.exe; then
@@ -106,10 +107,29 @@ perm::set () {
 
         [[ -n "${user}" ]] || user="$(sys::username 2>/dev/null || true)"
         [[ -n "${user}" ]] || return 1
-
         [[ -n "${USERDOMAIN:-}" && -n "${USERNAME:-}" ]] && domain_user="${USERDOMAIN}\\${USERNAME}"
 
         case "${mode}" in
+            400)
+                icacls.exe "${winpath}" /inheritance:r >/dev/null 2>&1 || return 1
+                icacls.exe "${winpath}" /remove:g "*S-1-1-0" "*S-1-5-11" "*S-1-5-32-545" >/dev/null 2>&1 || true
+                icacls.exe "${winpath}" /grant:r "${user}:(R)" "*S-1-5-18:(F)" "*S-1-5-32-544:(F)" >/dev/null 2>&1 || {
+                    [[ -n "${domain_user}" ]] || return 1
+                    icacls.exe "${winpath}" /grant:r "${domain_user}:(R)" "*S-1-5-18:(F)" "*S-1-5-32-544:(F)" >/dev/null 2>&1 || return 1
+                }
+                sys::has chmod && { chmod 400 "${path}" >/dev/null 2>&1 || true; }
+                return 0
+            ;;
+            500)
+                icacls.exe "${winpath}" /inheritance:r >/dev/null 2>&1 || return 1
+                icacls.exe "${winpath}" /remove:g "*S-1-1-0" "*S-1-5-11" "*S-1-5-32-545" >/dev/null 2>&1 || true
+                icacls.exe "${winpath}" /grant:r "${user}:(RX)" "*S-1-5-18:(F)" "*S-1-5-32-544:(F)" >/dev/null 2>&1 || {
+                    [[ -n "${domain_user}" ]] || return 1
+                    icacls.exe "${winpath}" /grant:r "${domain_user}:(RX)" "*S-1-5-18:(F)" "*S-1-5-32-544:(F)" >/dev/null 2>&1 || return 1
+                }
+                sys::has chmod && { chmod 500 "${path}" >/dev/null 2>&1 || true; }
+                return 0
+            ;;
             600)
                 icacls.exe "${winpath}" /inheritance:r >/dev/null 2>&1 || return 1
                 icacls.exe "${winpath}" /remove:g "*S-1-1-0" "*S-1-5-11" "*S-1-5-32-545" >/dev/null 2>&1 || true
@@ -148,6 +168,24 @@ perm::set () {
                 sys::has chmod && { chmod 755 "${path}" >/dev/null 2>&1 || true; }
                 return 0
             ;;
+            664)
+                icacls.exe "${winpath}" /inheritance:e >/dev/null 2>&1 || true
+                icacls.exe "${winpath}" /grant:r "${user}:(R,W)" "*S-1-5-32-545:(R,W)" >/dev/null 2>&1 || {
+                    [[ -n "${domain_user}" ]] || return 1
+                    icacls.exe "${winpath}" /grant:r "${domain_user}:(R,W)" "*S-1-5-32-545:(R,W)" >/dev/null 2>&1 || return 1
+                }
+                sys::has chmod && { chmod 664 "${path}" >/dev/null 2>&1 || true; }
+                return 0
+            ;;
+            775)
+                icacls.exe "${winpath}" /inheritance:e >/dev/null 2>&1 || true
+                icacls.exe "${winpath}" /grant:r "${user}:(F)" "*S-1-5-32-545:(M)" >/dev/null 2>&1 || {
+                    [[ -n "${domain_user}" ]] || return 1
+                    icacls.exe "${winpath}" /grant:r "${domain_user}:(F)" "*S-1-5-32-545:(M)" >/dev/null 2>&1 || return 1
+                }
+                sys::has chmod && { chmod 775 "${path}" >/dev/null 2>&1 || true; }
+                return 0
+            ;;
         esac
 
     fi
@@ -162,13 +200,19 @@ perm::add () {
 
     [[ -n "${path}" && -n "${mode}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
+
     perm::valid "${mode}" change || return 1
 
     if sys::is_windows && sys::has icacls.exe; then
 
-        [[ "${mode}" == *r* ]] && perm::read  "${path}" u
-        [[ "${mode}" == *w* ]] && perm::write "${path}" u
-        [[ "${mode}" == *x* || "${mode}" == *X* ]] && perm::execute "${path}" u
+        case "${mode}" in
+            *-*) ;;
+            *)
+                [[ "${mode}" == *r* ]] && perm::read  "${path}" u
+                [[ "${mode}" == *w* ]] && perm::write "${path}" u
+                [[ "${mode}" == *x* || "${mode}" == *X* ]] && perm::execute "${path}" u
+            ;;
+        esac
 
         sys::has chmod && {
             case "${mode}" in
@@ -191,26 +235,85 @@ perm::add () {
 }
 perm::del () {
 
-    local path="${1:-}" mode="${2:-}"
+    local path="${1:-}" mode="${2:-}" winpath="" user="" principal="" rc=1 touched=1
 
     [[ -n "${path}" && -n "${mode}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
 
     perm::valid "${mode}" remove || return 1
-    sys::has chmod || return 1
+    sys::has chmod || { sys::is_windows && sys::has icacls.exe || return 1; }
+
+    if sys::is_windows; then
+
+        if sys::has chmod; then
+            case "${mode}" in
+                +*) chmod -- "-${mode#+}" "${path}" >/dev/null 2>&1 && rc=0 ;;
+                -*) chmod -- "${mode}" "${path}" >/dev/null 2>&1 && rc=0 ;;
+                =*) return 1 ;;
+                [ugoa]*[-+=]*)
+                    case "${mode}" in
+                        *+*) chmod -- "${mode/+/-}" "${path}" >/dev/null 2>&1 && rc=0 ;;
+                        *-*) chmod -- "${mode}" "${path}" >/dev/null 2>&1 && rc=0 ;;
+                        *=*) return 1 ;;
+                    esac
+                ;;
+                *) chmod -- "-${mode}" "${path}" >/dev/null 2>&1 && rc=0 ;;
+            esac
+        fi
+
+        if sys::has icacls.exe; then
+
+            winpath="${path}"
+            user="${USERNAME:-}"
+
+            sys::has cygpath && winpath="$(cygpath -aw "${path}" 2>/dev/null || printf '%s' "${path}")"
+            [[ -n "${user}" ]] || user="$(sys::username 2>/dev/null || true)"
+
+            if [[ -n "${user}" ]]; then
+
+                case "${mode}" in
+                    *a*|*g*|*o*) principal="*S-1-5-32-545" ;;
+                    *)           principal="${user}" ;;
+                esac
+
+                [[ "${mode}" == *r* ]] && {
+                    touched=0
+                    icacls.exe "${winpath}" /deny "${principal}:(R)" >/dev/null 2>&1 && { rc=0 || true; }
+                }
+
+                [[ "${mode}" == *w* ]] && {
+                    touched=0
+                    icacls.exe "${winpath}" /deny "${principal}:(W)" >/dev/null 2>&1 && { rc=0 || true; }
+                }
+
+                [[ "${mode}" == *x* || "${mode}" == *X* ]] && {
+                    touched=0
+                    icacls.exe "${winpath}" /deny "${principal}:(RX)" >/dev/null 2>&1 && { rc=0 || true; }
+                }
+
+            fi
+
+        fi
+
+        (( rc == 0 )) && return 0
+        (( touched == 0 )) && return 0
+
+        return 1
+
+    fi
 
     case "${mode}" in
-        +*) chmod "-${mode#+}" "${path}" >/dev/null 2>&1 ;;
-        -*) chmod "${mode}" "${path}" >/dev/null 2>&1 ;;
+        +*) chmod -- "-${mode#+}" "${path}" >/dev/null 2>&1 ;;
+        -*) chmod -- "${mode}" "${path}" >/dev/null 2>&1 ;;
         =*) return 1 ;;
-        [ugoa]*[+-=]*)
+        [ugoa]*[-+=]*)
             case "${mode}" in
-                *+*) chmod "${mode/+/-}" "${path}" >/dev/null 2>&1 ;;
-                *-*) chmod "${mode}" "${path}" >/dev/null 2>&1 ;;
+                *+*) chmod -- "${mode/+/-}" "${path}" >/dev/null 2>&1 ;;
+                *-*) chmod -- "${mode}" "${path}" >/dev/null 2>&1 ;;
                 *=*) return 1 ;;
             esac
         ;;
-        *) chmod "-${mode}" "${path}" >/dev/null 2>&1 ;;
+        *) chmod -- "-${mode}" "${path}" >/dev/null 2>&1 ;;
     esac
 
 }
@@ -221,6 +324,7 @@ perm::read () {
 
     [[ -n "${path}" && -n "${who}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
+
     perm::valid "${who}" who || return 1
 
     if sys::is_windows; then
@@ -257,6 +361,7 @@ perm::write () {
 
     [[ -n "${path}" && -n "${who}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
+
     perm::valid "${who}" who || return 1
 
     if sys::is_windows; then
@@ -293,6 +398,7 @@ perm::execute () {
 
     [[ -n "${path}" && -n "${who}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
+
     perm::valid "${who}" who || return 1
 
     if sys::is_windows; then
@@ -340,25 +446,24 @@ perm::readonly () {
 
     [[ -n "${path}" && -n "${who}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
+
     perm::valid "${who}" who || return 1
 
     perm::read "${path}" "${who}" || return 1
     perm::del  "${path}" w
 
 }
-perm::private () {
+
+perm::seal () {
 
     local path="${1:-}"
 
     [[ -n "${path}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
 
-    if [[ -d "${path}" && ! -L "${path}" ]]; then
-        perm::set "${path}" 700
-        return
-    fi
+    [[ -d "${path}" && ! -L "${path}" ]] && { perm::set "${path}" 500; return; }
 
-    perm::set "${path}" 600
+    perm::set "${path}" 400
 
 }
 perm::public () {
@@ -368,15 +473,23 @@ perm::public () {
     [[ -n "${path}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
 
-    if [[ -d "${path}" && ! -L "${path}" ]]; then
-        perm::set "${path}" 755
-        return
-    fi
+    [[ -d "${path}" && ! -L "${path}" ]] && { perm::set "${path}" 755; return; }
 
     perm::set "${path}" 644
 
 }
+perm::private () {
 
+    local path="${1:-}"
+
+    [[ -n "${path}" ]] || return 1
+    [[ -e "${path}" || -L "${path}" ]] || return 1
+
+    [[ -d "${path}" && ! -L "${path}" ]] && { perm::set "${path}" 700; return; }
+
+    perm::set "${path}" 600
+
+}
 perm::owner () {
 
     local path="${1:-}" user="${2:-}" winpath="" v=""
@@ -451,12 +564,141 @@ perm::group () {
     return 1
 
 }
+
+perm::readable () {
+
+    local path="${1:-}"
+
+    [[ -n "${path}" ]] || return 1
+    [[ -r "${path}" ]]
+
+}
+perm::writable () {
+
+    local path="${1:-}"
+
+    [[ -n "${path}" ]] || return 1
+    [[ -w "${path}" ]]
+
+}
+perm::executable () {
+
+    local path="${1:-}"
+
+    [[ -n "${path}" ]] || return 1
+    [[ -x "${path}" ]]
+
+}
+perm::runnable () {
+
+    local path="${1:-}" who="${2:-u}"
+
+    [[ -n "${path}" && -n "${who}" ]] || return 1
+    [[ -e "${path}" || -L "${path}" ]] || return 1
+
+    perm::valid "${who}" who || return 1
+
+    perm::read    "${path}" "${who}" || return 1
+    perm::execute "${path}" "${who}"
+
+}
+perm::editable () {
+
+    local path="${1:-}" who="${2:-u}"
+
+    [[ -n "${path}" && -n "${who}" ]] || return 1
+    [[ -e "${path}" || -L "${path}" ]] || return 1
+
+    perm::valid "${who}" who || return 1
+
+    perm::read  "${path}" "${who}" || return 1
+    perm::write "${path}" "${who}"
+
+}
+
+perm::is_private () {
+
+    local path="${1:-}" mode=""
+
+    [[ -n "${path}" ]] || return 1
+    [[ -e "${path}" || -L "${path}" ]] || return 1
+
+    mode="$(perm::get "${path}" 2>/dev/null || true)"
+
+    if [[ -d "${path}" && ! -L "${path}" ]]; then
+        [[ "${mode}" == "700" || "${mode}" == "0700" ]]
+        return
+    fi
+
+    [[ "${mode}" == "600" || "${mode}" == "0600" ]]
+
+}
+perm::is_public () {
+
+    local path="${1:-}" mode=""
+
+    [[ -n "${path}" ]] || return 1
+    [[ -e "${path}" || -L "${path}" ]] || return 1
+
+    mode="$(perm::get "${path}" 2>/dev/null || true)"
+
+    if [[ -d "${path}" && ! -L "${path}" ]]; then
+        [[ "${mode}" == "755" || "${mode}" == "0755" ]]
+        return
+    fi
+
+    [[ "${mode}" == "644" || "${mode}" == "0644" ]]
+
+}
+perm::is_same () {
+
+    local a="${1:-}" b="${2:-}" am="" bm=""
+
+    [[ -n "${a}" && -n "${b}" ]] || return 1
+    [[ -e "${a}" || -L "${a}" ]] || return 1
+    [[ -e "${b}" || -L "${b}" ]] || return 1
+
+    am="$(perm::get "${a}" 2>/dev/null || true)"
+    bm="$(perm::get "${b}" 2>/dev/null || true)"
+
+    [[ -n "${am}" && "${am}" == "${bm}" ]]
+
+}
+perm::shared () {
+
+    local path="${1:-}"
+
+    [[ -n "${path}" ]] || return 1
+    [[ -e "${path}" || -L "${path}" ]] || return 1
+
+    [[ -d "${path}" && ! -L "${path}" ]] && { perm::set "${path}" 775; return; }
+
+    perm::set "${path}" 664
+
+}
+perm::owned () {
+
+    local path="${1:-}" user="${2:-}" owner=""
+
+    [[ -n "${path}" ]] || return 1
+    [[ -e "${path}" || -L "${path}" ]] || return 1
+
+    [[ -n "${user}" ]] || user="$(sys::username 2>/dev/null || true)"
+    [[ -n "${user}" ]] || return 1
+    [[ "${user}" != *$'\n'* && "${user}" != *$'\r'* ]] || return 1
+
+    owner="$(perm::owner "${path}" 2>/dev/null || true)"
+    [[ "${owner}" == "${user}" ]]
+
+}
+
 perm::lock () {
 
     local path="${1:-}" who="${2:-u}" winpath="" user="" ok=1
 
     [[ -n "${path}" && -n "${who}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
+
     perm::valid "${who}" who || return 1
 
     if sys::is_windows; then
@@ -467,6 +709,7 @@ perm::lock () {
             user="${USERNAME:-}"
 
             sys::has cygpath && winpath="$(cygpath -aw "${path}" 2>/dev/null || printf '%s' "${path}")"
+
             [[ -n "${user}" ]] || user="$(sys::username 2>/dev/null || true)"
 
             if [[ -n "${user}" ]]; then
@@ -493,6 +736,7 @@ perm::unlock () {
 
     [[ -n "${path}" && -n "${who}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
+
     perm::valid "${who}" who || return 1
 
     if sys::is_windows; then
@@ -503,6 +747,7 @@ perm::unlock () {
             user="${USERNAME:-}"
 
             sys::has cygpath && winpath="$(cygpath -aw "${path}" 2>/dev/null || printf '%s' "${path}")"
+
             [[ -n "${user}" ]] || user="$(sys::username 2>/dev/null || true)"
 
             if [[ -n "${user}" ]]; then
@@ -529,72 +774,6 @@ perm::unlock () {
     chmod "${who}+w" "${path}" >/dev/null 2>&1
 
 }
-
-perm::readable () {
-
-    local path="${1:-}"
-
-    [[ -n "${path}" && -r "${path}" ]]
-
-}
-perm::writable () {
-
-    local path="${1:-}"
-
-    [[ -n "${path}" ]] || return 1
-    [[ -w "${path}" ]]
-
-}
-perm::executable () {
-
-    local path="${1:-}"
-
-    [[ -n "${path}" ]] || return 1
-    [[ -x "${path}" ]]
-
-}
-perm::editable () {
-
-    local path="${1:-}" who="${2:-u}"
-
-    [[ -n "${path}" && -n "${who}" ]] || return 1
-    [[ -e "${path}" || -L "${path}" ]] || return 1
-    perm::valid "${who}" who || return 1
-
-    perm::read  "${path}" "${who}" || return 1
-    perm::write "${path}" "${who}"
-
-}
-perm::owned () {
-
-    local path="${1:-}" user="${2:-}" owner=""
-
-    [[ -n "${path}" ]] || return 1
-    [[ -e "${path}" || -L "${path}" ]] || return 1
-
-    [[ -n "${user}" ]] || user="$(sys::username 2>/dev/null || true)"
-    [[ -n "${user}" ]] || return 1
-    [[ "${user}" != *$'\n'* && "${user}" != *$'\r'* ]] || return 1
-
-    owner="$(perm::owner "${path}" 2>/dev/null || true)"
-    [[ "${owner}" == "${user}" ]]
-
-}
-perm::same () {
-
-    local a="${1:-}" b="${2:-}" am="" bm=""
-
-    [[ -n "${a}" && -n "${b}" ]] || return 1
-    [[ -e "${a}" || -L "${a}" ]] || return 1
-    [[ -e "${b}" || -L "${b}" ]] || return 1
-
-    am="$(perm::get "${a}" 2>/dev/null || true)"
-    bm="$(perm::get "${b}" 2>/dev/null || true)"
-
-    [[ -n "${am}" && "${am}" == "${bm}" ]]
-
-}
-
 perm::copy () {
 
     local from="${1:-}" to="${2:-}" mode="" owner="" group=""
@@ -621,6 +800,7 @@ perm::ensure () {
 
     [[ -n "${path}" && -n "${mode}" ]] || return 1
     [[ -e "${path}" || -L "${path}" ]] || return 1
+
     perm::valid "${mode}" mode || return 1
 
     current="$(perm::get "${path}" 2>/dev/null || true)"

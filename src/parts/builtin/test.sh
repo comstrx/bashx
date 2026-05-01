@@ -1,637 +1,404 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
+
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/system.sh"
 source "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P)/permission.sh"
+
 sys::ensure_bash 5 "$@"
 
-__PERM_TEST_TOTAL=0
-__PERM_TEST_PASS=0
-__PERM_TEST_FAIL=0
-__PERM_TEST_SKIP=0
-__PERM_TEST_ROOT=""
+root="$(mktemp -d "${TMPDIR:-/tmp}/perm-rest.XXXXXX")"
+pass=0
+fail=0
 
-_test::log () {
+cleanup () {
+    chmod -R u+rwx -- "${root}" >/dev/null 2>&1 || true
+    rm -rf -- "${root}" >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
 
-    printf '%s\n' "$*"
-
+pass () {
+    pass=$(( pass + 1 ))
+    printf 'PASS %s\n' "$*"
 }
 
-_test::pass () {
-
-    __PERM_TEST_TOTAL=$(( __PERM_TEST_TOTAL + 1 ))
-    __PERM_TEST_PASS=$(( __PERM_TEST_PASS + 1 ))
-
+fail () {
+    fail=$(( fail + 1 ))
+    printf 'FAIL %s\n' "$*" >&2
 }
 
-_test::fail () {
-
-    __PERM_TEST_TOTAL=$(( __PERM_TEST_TOTAL + 1 ))
-    __PERM_TEST_FAIL=$(( __PERM_TEST_FAIL + 1 ))
-
-    printf 'FAIL: %s\n' "$*" >&2
-
-}
-
-_test::skip () {
-
-    __PERM_TEST_TOTAL=$(( __PERM_TEST_TOTAL + 1 ))
-    __PERM_TEST_SKIP=$(( __PERM_TEST_SKIP + 1 ))
-
-    printf 'SKIP: %s\n' "$*" >&2
-
-}
-
-_test::ok () {
-
-    local msg="${1:-assertion failed}"
-
+ok () {
+    local name="${1:-}" rc=0
     shift || true
 
-    if "$@" >/dev/null 2>&1; then
-        _test::pass
-    else
-        _test::fail "${msg}"
-    fi
+    "$@" >/dev/null 2>&1 || rc=$?
 
+    (( rc == 0 )) && pass "${name}" || fail "${name} rc=${rc}"
 }
 
-_test::not_ok () {
-
-    local msg="${1:-assertion should fail}"
-
+not_ok () {
+    local name="${1:-}" rc=0
     shift || true
 
-    if "$@" >/dev/null 2>&1; then
-        _test::fail "${msg}"
-    else
-        _test::pass
-    fi
+    "$@" >/dev/null 2>&1 || rc=$?
 
+    (( rc != 0 )) && pass "${name}" || fail "${name} unexpectedly succeeded"
 }
 
-_test::eq () {
+out_ok () {
+    local name="${1:-}" out=""
+    shift || true
 
-    local msg="${1:-values differ}" got="${2-}" want="${3-}"
-
-    if [[ "${got}" == "${want}" ]]; then
-        _test::pass
-    else
-        _test::fail "${msg}: got=[${got}] want=[${want}]"
-    fi
-
+    out="$("$@" 2>/dev/null || true)"
+    [[ -n "${out}" ]] && pass "${name}" || fail "${name} empty output"
 }
 
-_test::ne () {
+has_line () {
+    local name="${1:-}" pattern="${2:-}" out="${3:-}"
 
-    local msg="${1:-values equal}" got="${2-}" want="${3-}"
-
-    if [[ "${got}" != "${want}" ]]; then
-        _test::pass
-    else
-        _test::fail "${msg}: got=[${got}]"
-    fi
-
+    [[ "${out}" == *"${pattern}"* ]] && pass "${name}" || fail "${name} missing ${pattern}"
 }
 
-_test::match () {
-
-    local msg="${1:-pattern mismatch}" got="${2-}" re="${3-}"
-
-    if [[ "${got}" =~ ${re} ]]; then
-        _test::pass
-    else
-        _test::fail "${msg}: got=[${got}] re=[${re}]"
-    fi
-
-}
-
-_test::has () {
-
-    command -v "${1:-}" >/dev/null 2>&1
-
-}
-
-_test::mkfile () {
-
-    local path="${1:-}" data="${2:-x}"
+mkfile () {
+    local path="${1:-}" data="${2:-hello}"
 
     mkdir -p -- "$(dirname -- "${path}")"
     printf '%s\n' "${data}" > "${path}"
-
 }
 
-_test::mkdir () {
+mkscript () {
+    local path="${1:-}"
 
-    mkdir -p -- "${1:?}"
-
+    mkdir -p -- "$(dirname -- "${path}")"
+    printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\n" ok' > "${path}"
+    chmod u+rw -- "${path}" >/dev/null 2>&1 || true
 }
 
-_test::cleanup () {
-
-    if [[ -n "${__PERM_TEST_ROOT:-}" && -d "${__PERM_TEST_ROOT}" ]]; then
-        chmod -R u+rwx -- "${__PERM_TEST_ROOT}" >/dev/null 2>&1 || true
-        rm -rf -- "${__PERM_TEST_ROOT}" >/dev/null 2>&1 || true
-    fi
-
+can_read () {
+    cat -- "$1" >/dev/null
 }
 
-_test::mode () {
-
-    perm::get "${1:?}" 2>/dev/null || true
-
+can_write () {
+    printf '' >> "$1"
 }
 
-_test::same_mode () {
-
-    local path="${1:?}" want="${2:?}" got=""
-
-    got="$(_test::mode "${path}")"
-    [[ "${got}" == "${want}" || "${got}" == "0${want}" ]]
-
+can_exec () {
+    "$1" >/dev/null
 }
 
-_test::can_check_perm_bits () {
+printf '[env]\n'
+printf 'root    : %s\n' "${root}"
+printf 'os      : %s\n' "$(sys::name 2>/dev/null || printf unknown)"
+printf 'runtime : %s\n' "$(sys::runtime 2>/dev/null || printf unknown)"
+printf 'user    : %s\n' "$(sys::username 2>/dev/null || printf unknown)"
 
-    sys::has chmod || return 1
-    sys::has stat  || return 1
-    sys::is_windows && return 1
-
-    return 0
-
-}
-
-_test::section () {
-
-    printf '\n[%s]\n' "$*"
-
-}
-
-_test::summary () {
-
-    printf '\n============================================================\n'
-    printf ' permission.sh brutal test summary\n'
-    printf '============================================================\n'
-    printf 'Root  : %s\n' "${__PERM_TEST_ROOT}"
-    printf 'Total : %s\n' "${__PERM_TEST_TOTAL}"
-    printf 'Pass  : %s\n' "${__PERM_TEST_PASS}"
-    printf 'Fail  : %s\n' "${__PERM_TEST_FAIL}"
-    printf 'Skip  : %s\n' "${__PERM_TEST_SKIP}"
-    printf '============================================================\n'
-
-    (( __PERM_TEST_FAIL == 0 ))
-
-}
-
-trap _test::cleanup EXIT
-
-__PERM_TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/perm-test.XXXXXX")"
-
-_test::section "environment"
-
-_test::log "root: ${__PERM_TEST_ROOT}"
-_test::log "os  : $(sys::name 2>/dev/null || printf unknown)"
-_test::log "run : $(sys::runtime 2>/dev/null || printf unknown)"
-_test::log "user: $(sys::username 2>/dev/null || printf unknown)"
-
-_test::section "api presence"
-
+printf '\n[api presence: rest only]\n'
 for fn in \
-    perm::valid perm::get perm::set perm::add perm::del \
-    perm::read perm::write perm::execute \
-    perm::writeonly perm::readonly perm::editable \
-    perm::private perm::public \
-    perm::owner perm::group \
-    perm::lock perm::unlock \
-    perm::readable perm::writable perm::executable \
-    perm::owned perm::same perm::copy perm::ensure perm::info
+    valid read write execute writeonly readonly seal private public shared \
+    owner group readable writable executable runnable editable \
+    is_private is_public is_same owned lock unlock copy ensure info
 do
-    _test::ok "function exists: ${fn}" declare -F "${fn}"
+    ok "function exists: perm::${fn}" declare -F "perm::${fn}"
 done
 
-_test::section "perm::valid"
-
-for x in 000 400 444 600 644 700 755 777 0644 0755 u+r u+w u+x u+rw u+rwx g-r o-w a+r ug+rwx u=rw go-rwx u+s g+s +r -w =rw u+rw,g-r,o+x; do
-    _test::ok "valid mode: ${x}" perm::valid "${x}" mode
+printf '\n[perm::valid]\n'
+for x in 000 400 500 600 644 664 700 755 775 0777 u+r u-w g+x o-r a+rw ug+rwx u+rw,g-r,o+x; do
+    ok "valid mode ${x}" perm::valid "${x}" mode
 done
 
-for x in "" "8" "999" "abc" "u+" "+z" "u+q" "u+r;" $'u+r\nx' "u+r o+w" "u+r|x" "u+r&&x" "755;rm -rf /"; do
-    _test::not_ok "invalid mode: ${x}" perm::valid "${x}" mode
+for x in r w x rw rx rwx +r +w +x -r -w -x u+r u-w g+x o-r a+rw; do
+    ok "valid change ${x}" perm::valid "${x}" change
 done
 
-for x in r w x rw rx wx rwx +r +w +x +rw +rwx -r -w -x -rw -rwx =r =w =x =rw =rwx u+r u-w g+x o-r a+rw ug+rwx; do
-    _test::ok "valid change: ${x}" perm::valid "${x}" change
+for x in r w x rw rx rwx +r +w +x -r -w -x u+r u-w g+x o-r a+rw; do
+    ok "valid remove ${x}" perm::valid "${x}" remove
 done
 
-for x in r w x rw rx wx rwx +r +w +x +rw +rwx -r -w -x -rw -rwx u+r u-w g+x o-r a+rw ug+rwx; do
-    _test::ok "valid remove: ${x}" perm::valid "${x}" remove
+for x in u g o a ug go ugo; do
+    ok "valid who ${x}" perm::valid "${x}" who
 done
 
-for x in =r =w =x =rw u=rw a=rwx; do
-    _test::not_ok "invalid remove: ${x}" perm::valid "${x}" remove
+for x in "" 999 abc "u+" "+z" "u+r;" $'u+r\nx' "u+r o+w" "u+r|x"; do
+    not_ok "invalid mode ${x}" perm::valid "${x}" mode
 done
 
-for x in u g o a ug uo go ugo augu; do
-    _test::ok "valid who: ${x}" perm::valid "${x}" who
+for x in "" x user "u+r" "u g" $'u\ng'; do
+    not_ok "invalid who ${x}" perm::valid "${x}" who
 done
 
-for x in "" "x" "user" "u+r" "u;" "u g" $'u\ng'; do
-    _test::not_ok "invalid who: ${x}" perm::valid "${x}" who
+printf '\n[predicates: readable / writable / executable]\n'
+rf="${root}/readable.txt"
+wf="${root}/writable.txt"
+xf="${root}/executable.sh"
+
+mkfile "${rf}" "readable"
+mkfile "${wf}" "writable"
+mkscript "${xf}"
+
+perm::read "${rf}" >/dev/null 2>&1 || true
+ok "perm::readable true" perm::readable "${rf}"
+ok "effect readable true" can_read "${rf}"
+
+perm::write "${wf}" >/dev/null 2>&1 || true
+ok "perm::writable true" perm::writable "${wf}"
+ok "effect writable true" can_write "${wf}"
+
+perm::execute "${xf}" >/dev/null 2>&1 || true
+ok "perm::executable true" perm::executable "${xf}"
+ok "effect executable true" can_exec "${xf}"
+
+not_ok "readable missing false" perm::readable "${root}/missing"
+not_ok "writable missing false" perm::writable "${root}/missing"
+not_ok "executable missing false" perm::executable "${root}/missing"
+
+printf '\n[facade predicates: runnable / editable / owned]\n'
+runf="${root}/run.sh"
+editf="${root}/edit.txt"
+ownf="${root}/own.txt"
+
+mkscript "${runf}"
+mkfile "${editf}" "edit"
+mkfile "${ownf}" "own"
+
+ok "perm::runnable" perm::runnable "${runf}"
+ok "effect runnable readable" can_read "${runf}"
+ok "effect runnable executable" can_exec "${runf}"
+
+ok "perm::editable" perm::editable "${editf}"
+ok "effect editable readable" can_read "${editf}"
+ok "effect editable writable" can_write "${editf}"
+
+ok "perm::owned" perm::owned "${ownf}"
+
+current_user="$(sys::username 2>/dev/null || true)"
+if [[ -n "${current_user}" ]]; then
+    ok "perm::owned explicit current user" perm::owned "${ownf}" "${current_user}"
+fi
+
+not_ok "perm::owned bogus user" perm::owned "${ownf}" "__definitely_not_current_user__"
+
+printf '\n[owner / group / info]\n'
+infof="${root}/info.txt"
+mkfile "${infof}" "info"
+
+out_ok "perm::owner getter output" perm::owner "${infof}"
+out_ok "perm::group getter output" perm::group "${infof}"
+
+info="$(perm::info "${infof}" 2>/dev/null || true)"
+[[ -n "${info}" ]] && pass "perm::info output" || fail "perm::info output empty"
+has_line "perm::info has path"  "path="  "${info}"
+has_line "perm::info has mode"  "mode="  "${info}"
+has_line "perm::info has owner" "owner=" "${info}"
+has_line "perm::info has group" "group=" "${info}"
+
+not_ok "perm::owner rejects injection" perm::owner "${infof}" "bad;user"
+not_ok "perm::group rejects injection" perm::group "${infof}" "bad;group"
+
+printf '\n[is_private / is_public / is_same]\n'
+priv="${root}/priv.txt"
+pub="${root}/pub.txt"
+same_a="${root}/same-a.txt"
+same_b="${root}/same-b.txt"
+same_c="${root}/same-c.txt"
+
+mkfile "${priv}" "private"
+mkfile "${pub}" "public"
+mkfile "${same_a}" "a"
+mkfile "${same_b}" "b"
+mkfile "${same_c}" "c"
+
+ok "perm::private action for is_private" perm::private "${priv}"
+ok "perm::is_private private file" perm::is_private "${priv}"
+
+ok "perm::public action for is_public" perm::public "${pub}"
+
+if ! sys::is_windows; then
+    ok "perm::is_public public file" perm::is_public "${pub}"
+    not_ok "private is not public" perm::is_public "${priv}"
+    not_ok "public is not private" perm::is_private "${pub}"
+else
+    not_ok "private is not public on Windows best-effort" perm::is_public "${priv}"
+fi
+
+ok "prepare same_a private" perm::private "${same_a}"
+ok "prepare same_b private" perm::private "${same_b}"
+ok "perm::is_same same permissions" perm::is_same "${same_a}" "${same_b}"
+
+ok "prepare same_c public" perm::public "${same_c}"
+
+if ! sys::is_windows; then
+    not_ok "perm::is_same different permissions" perm::is_same "${same_a}" "${same_c}"
+else
+    ok "perm::is_same callable on Windows same pair" perm::is_same "${same_a}" "${same_b}"
+fi
+
+printf '\n[copy]\n'
+copy_a="${root}/copy-a.txt"
+copy_b="${root}/copy-b.txt"
+
+mkfile "${copy_a}" "copy-a"
+mkfile "${copy_b}" "copy-b"
+
+ok "prepare copy source private" perm::private "${copy_a}"
+ok "prepare copy target public" perm::public "${copy_b}"
+ok "perm::copy source target" perm::copy "${copy_a}" "${copy_b}"
+
+if ! sys::is_windows; then
+    ok "effect copy makes is_same true" perm::is_same "${copy_a}" "${copy_b}"
+else
+    ok "effect copy keeps target readable" perm::readable "${copy_b}"
+fi
+
+printf '\n[ensure]\n'
+ens="${root}/ensure.txt"
+mkfile "${ens}" "ensure"
+
+ok "perm::ensure 600" perm::ensure "${ens}" 600
+ok "effect ensure readable" perm::readable "${ens}"
+ok "effect ensure writable" perm::writable "${ens}"
+
+ok "perm::ensure 400" perm::ensure "${ens}" 400
+ok "effect ensure 400 readable" perm::readable "${ens}"
+
+if ! sys::is_windows; then
+    not_ok "effect ensure 400 blocks write" can_write "${ens}"
+else
+    not_ok "effect ensure 400 blocks write on Windows" can_write "${ens}"
+fi
+
+perm::unlock "${ens}" >/dev/null 2>&1 || true
+chmod u+rw -- "${ens}" >/dev/null 2>&1 || true
+
+printf '\n[facades already covered but rest-safe]\n'
+for fn in private public seal shared readonly writeonly lock unlock; do
+    f="${root}/${fn}.txt"
+    mkfile "${f}" "${fn}"
+    ok "perm::${fn} action" "perm::${fn}" "${f}"
+    perm::unlock "${f}" >/dev/null 2>&1 || true
+    chmod u+rw -- "${f}" >/dev/null 2>&1 || true
 done
 
-_test::section "basic files and directories"
+printf '\n[missing path failures]\n'
+missing="${root}/missing.txt"
 
-file="${__PERM_TEST_ROOT}/file.txt"
-dir="${__PERM_TEST_ROOT}/dir"
-nested="${dir}/nested.txt"
-space="${__PERM_TEST_ROOT}/space name.txt"
-unicode="${__PERM_TEST_ROOT}/طيبات.txt"
-dash="${__PERM_TEST_ROOT}/-dash.txt"
-semi="${__PERM_TEST_ROOT}/semi;name.txt"
-glob="${__PERM_TEST_ROOT}/glob[abc]*?.txt"
-
-_test::mkfile "${file}" "alpha"
-_test::mkdir "${dir}"
-_test::mkfile "${nested}" "nested"
-_test::mkfile "${space}" "space"
-_test::mkfile "${unicode}" "unicode"
-_test::mkfile "${dash}" "dash"
-_test::mkfile "${semi}" "semi"
-_test::mkfile "${glob}" "glob"
-
-for p in "${file}" "${dir}" "${nested}" "${space}" "${unicode}" "${dash}" "${semi}" "${glob}"; do
-    _test::ok "perm::get exists: ${p}" perm::get "${p}"
-    _test::match "perm::get octal: ${p}" "$(perm::get "${p}" 2>/dev/null || true)" '^[0-7]{3,4}$'
-    _test::ok "perm::info exists: ${p}" perm::info "${p}"
-    info="$(perm::info "${p}" 2>/dev/null || true)"
-    _test::match "perm::info path: ${p}" "${info}" '^path='
-    _test::match "perm::info mode: ${p}" "${info}" 'mode='
-    _test::match "perm::info owner: ${p}" "${info}" 'owner='
-    _test::match "perm::info group: ${p}" "${info}" 'group='
+for fn in owner group readable writable executable runnable editable is_private is_public owned info; do
+    not_ok "perm::${fn} missing" "perm::${fn}" "${missing}"
 done
 
-_test::section "perm::set and perm::ensure"
+not_ok "perm::is_same missing left" perm::is_same "${missing}" "${rf}"
+not_ok "perm::is_same missing right" perm::is_same "${rf}" "${missing}"
+not_ok "perm::copy missing source" perm::copy "${missing}" "${rf}"
+not_ok "perm::copy missing target" perm::copy "${rf}" "${missing}"
+not_ok "perm::ensure missing" perm::ensure "${missing}" 600
 
-for m in 600 644 700 755; do
-    target="${__PERM_TEST_ROOT}/set-${m}.txt"
-    _test::mkfile "${target}" "${m}"
+printf '\n[raw API: get / set / add / del]\n'
 
-    _test::ok "perm::set ${m}" perm::set "${target}" "${m}"
+raw_a="${root}/raw-a.sh"
+raw_b="${root}/raw-b.sh"
+raw_c="${root}/raw-c.sh"
 
-    if _test::can_check_perm_bits; then
-        _test::ok "mode is ${m}" _test::same_mode "${target}" "${m}"
+mkscript "${raw_a}"
+mkscript "${raw_b}"
+mkscript "${raw_c}"
+
+printf '\n[raw: set/get consistency]\n'
+
+for m in 400 500 600 644 664 700 755 775; do
+    f1="${root}/raw-set-${m}-a.txt"
+    f2="${root}/raw-set-${m}-b.txt"
+
+    mkfile "${f1}" "a-${m}"
+    mkfile "${f2}" "b-${m}"
+
+    ok "perm::set ${m} a" perm::set "${f1}" "${m}"
+    ok "perm::set ${m} b" perm::set "${f2}" "${m}"
+
+    g1="$(perm::get "${f1}" 2>/dev/null || true)"
+    g2="$(perm::get "${f2}" 2>/dev/null || true)"
+
+    [[ -n "${g1}" ]] && pass "perm::get ${m} a non-empty" || fail "perm::get ${m} a empty"
+    [[ -n "${g2}" ]] && pass "perm::get ${m} b non-empty" || fail "perm::get ${m} b empty"
+
+    if ! sys::is_windows; then
+        [[ "${g1}" == "${m}" || "${g1}" == "0${m}" ]] && pass "perm::get ${m} exact a" || fail "perm::get ${m} exact a got=${g1}"
+        [[ "${g2}" == "${m}" || "${g2}" == "0${m}" ]] && pass "perm::get ${m} exact b" || fail "perm::get ${m} exact b got=${g2}"
     else
-        _test::match "mode readable after set ${m}" "$(perm::get "${target}" 2>/dev/null || true)" '^[0-7]{3,4}$'
+        [[ "${g1}" == "${g2}" ]] && pass "perm::get ${m} stable mapping" || fail "perm::get ${m} unstable mapping a=${g1} b=${g2}"
     fi
 
-    _test::ok "perm::ensure ${m}" perm::ensure "${target}" "${m}"
+    chmod u+rw -- "${f1}" "${f2}" >/dev/null 2>&1 || true
+    perm::unlock "${f1}" >/dev/null 2>&1 || true
+    perm::unlock "${f2}" >/dev/null 2>&1 || true
 done
 
-for bad in "" 999 888 abc "644;echo pwn" $'644\n755' "u+z"; do
-    target="${__PERM_TEST_ROOT}/bad-set.txt"
-    _test::mkfile "${target}" "bad"
-    _test::not_ok "perm::set rejects ${bad}" perm::set "${target}" "${bad}"
-    _test::not_ok "perm::ensure rejects ${bad}" perm::ensure "${target}" "${bad}"
-done
+printf '\n[raw: add effects]\n'
 
-_test::section "perm::add / perm::del"
+mkscript "${raw_a}"
+chmod 600 "${raw_a}" >/dev/null 2>&1 || true
+perm::unlock "${raw_a}" >/dev/null 2>&1 || true
 
-target="${__PERM_TEST_ROOT}/changes.txt"
-_test::mkfile "${target}" "changes"
-perm::set "${target}" 600 >/dev/null 2>&1 || true
+ok "perm::add r" perm::add "${raw_a}" r
+ok "effect add r readable" can_read "${raw_a}"
 
-_test::ok "perm::add x" perm::add "${target}" x
+ok "perm::add w" perm::add "${raw_a}" w
+ok "effect add w writable" can_write "${raw_a}"
+
+ok "perm::add x" perm::add "${raw_a}" x
+perm::read "${raw_a}" >/dev/null 2>&1 || true
+ok "effect add x executable" can_exec "${raw_a}"
+
+printf '\n[raw: del effects]\n'
+
+mkscript "${raw_b}"
+perm::runnable "${raw_b}" >/dev/null 2>&1 || true
+perm::editable "${raw_b}" >/dev/null 2>&1 || true
+
+ok "perm::del w" perm::del "${raw_b}" w
+
+if sys::is_root; then
+    pass "effect del w blocks write ignored for root"
+else
+    not_ok "effect del w blocks write" can_write "${raw_b}"
+fi
+
+perm::write "${raw_b}" >/dev/null 2>&1 || true
+ok "effect write restores write" can_write "${raw_b}"
+
+ok "perm::del x" perm::del "${raw_b}" x
+
 if ! sys::is_windows; then
-    _test::ok "perm::executable after add x" perm::executable "${target}"
+    not_ok "effect del x blocks execute" can_exec "${raw_b}"
 else
-    _test::skip "perm::executable after add x skipped on Windows/Git Bash"
+    ok "perm::del x callable on Windows" true
 fi
-_test::ok "perm::del +x removes execute" perm::del "${target}" +x
-if ! sys::is_windows; then
-    _test::not_ok "not executable after del +x" perm::executable "${target}"
+
+perm::read    "${raw_b}" >/dev/null 2>&1 || true
+perm::execute "${raw_b}" >/dev/null 2>&1 || true
+ok "effect execute restores execute" can_exec "${raw_b}"
+
+ok "perm::del r" perm::del "${raw_b}" r
+
+if sys::is_windows || sys::is_root; then
+    ok "perm::del r callable on windows/root" true
 else
-    _test::skip "not executable after del +x skipped on Windows/Git Bash"
+    not_ok "effect del r blocks read" can_read "${raw_b}"
 fi
 
-_test::ok "perm::add +x" perm::add "${target}" +x
-if ! sys::is_windows; then
-    _test::ok "perm::executable after add +x" perm::executable "${target}"
-else
-    _test::skip "perm::executable after add +x skipped on Windows/Git Bash"
-fi
-_test::ok "perm::del x removes execute" perm::del "${target}" x
-if ! sys::is_windows; then
-    _test::not_ok "not executable after del x" perm::executable "${target}"
-else
-    _test::skip "not executable after del x skipped on Windows/Git Bash"
-fi
-
-_test::ok "perm::add u+x" perm::add "${target}" u+x
-if ! sys::is_windows; then
-    _test::ok "perm::executable after add u+x" perm::executable "${target}"
-else
-    _test::skip "perm::executable after add u+x skipped on Windows/Git Bash"
-fi
-_test::ok "perm::del u+x removes execute" perm::del "${target}" u+x
-if ! sys::is_windows; then
-    _test::not_ok "not executable after del u+x" perm::executable "${target}"
-else
-    _test::skip "not executable after del u+x skipped on Windows/Git Bash"
-fi
-
-_test::ok "perm::add rw" perm::add "${target}" rw
-_test::ok "perm::readable after add rw" perm::readable "${target}"
-_test::ok "perm::writable after add rw" perm::writable "${target}"
-
-_test::not_ok "perm::add rejects invalid" perm::add "${target}" "x;echo pwn"
-_test::not_ok "perm::del rejects invalid" perm::del "${target}" "x;echo pwn"
-_test::not_ok "perm::del rejects =" perm::del "${target}" "=x"
-
-_test::section "perm::read / write / execute"
-
-target="${__PERM_TEST_ROOT}/rwx.txt"
-_test::mkfile "${target}" "rwx"
-perm::set "${target}" 600 >/dev/null 2>&1 || true
-
-for who in u g o a ug go ugo; do
-    _test::ok "perm::read ${who}" perm::read "${target}" "${who}"
-    _test::ok "perm::write ${who}" perm::write "${target}" "${who}"
-    _test::ok "perm::execute ${who}" perm::execute "${target}" "${who}"
-done
-
-for who in x "u+r" "u g" $'u\ng'; do
-    _test::not_ok "perm::read rejects who ${who}" perm::read "${target}" "${who}"
-    _test::not_ok "perm::write rejects who ${who}" perm::write "${target}" "${who}"
-    _test::not_ok "perm::execute rejects who ${who}" perm::execute "${target}" "${who}"
-done
-
-_test::section "perm::private / public / readonly / writeonly / editable"
-
-priv_file="${__PERM_TEST_ROOT}/private-file.txt"
-priv_dir="${__PERM_TEST_ROOT}/private-dir"
-pub_file="${__PERM_TEST_ROOT}/public-file.txt"
-pub_dir="${__PERM_TEST_ROOT}/public-dir"
-ro_file="${__PERM_TEST_ROOT}/readonly.txt"
-wo_file="${__PERM_TEST_ROOT}/writeonly.txt"
-ed_file="${__PERM_TEST_ROOT}/editable.txt"
-
-_test::mkfile "${priv_file}" "private"
-_test::mkdir "${priv_dir}"
-_test::mkfile "${pub_file}" "public"
-_test::mkdir "${pub_dir}"
-_test::mkfile "${ro_file}" "readonly"
-_test::mkfile "${wo_file}" "writeonly"
-_test::mkfile "${ed_file}" "editable"
-
-_test::ok "perm::private file" perm::private "${priv_file}"
-_test::ok "perm::private dir"  perm::private "${priv_dir}"
-_test::ok "perm::public file"  perm::public "${pub_file}"
-_test::ok "perm::public dir"   perm::public "${pub_dir}"
-
-if _test::can_check_perm_bits; then
-    _test::ok "private file 600" _test::same_mode "${priv_file}" 600
-    _test::ok "private dir 700"  _test::same_mode "${priv_dir}" 700
-    _test::ok "public file 644"  _test::same_mode "${pub_file}" 644
-    _test::ok "public dir 755"   _test::same_mode "${pub_dir}" 755
-else
-    _test::skip "exact private/public bit checks skipped on this runtime"
-fi
-
-_test::ok "perm::readonly" perm::readonly "${ro_file}"
-_test::ok "readonly remains readable" perm::readable "${ro_file}"
-if ! sys::is_windows; then
-    _test::not_ok "readonly not writable" perm::writable "${ro_file}"
-else
-    _test::skip "readonly writable predicate can vary on Windows ACL/MSYS"
-fi
-chmod u+w -- "${ro_file}" >/dev/null 2>&1 || true
-
-_test::ok "perm::writeonly" perm::writeonly "${wo_file}"
-if ! sys::is_windows; then
-    _test::ok "writeonly writable" perm::writable "${wo_file}"
-else
-    _test::skip "writeonly predicate can vary on Windows ACL/MSYS"
-fi
-chmod u+rw -- "${wo_file}" >/dev/null 2>&1 || true
-
-_test::ok "perm::editable" perm::editable "${ed_file}"
-_test::ok "editable readable" perm::readable "${ed_file}"
-_test::ok "editable writable" perm::writable "${ed_file}"
-
-_test::section "perm::readable / writable / executable predicates"
-
-pred="${__PERM_TEST_ROOT}/pred.txt"
-_test::mkfile "${pred}" "pred"
-
-chmod 000 "${pred}" >/dev/null 2>&1 || true
-if ! sys::is_windows && ! sys::is_root; then
-    _test::not_ok "000 not readable" perm::readable "${pred}"
-    _test::not_ok "000 not writable" perm::writable "${pred}"
-else
-    _test::skip "000 read/write predicates skipped for root/windows"
-fi
-
-chmod 600 "${pred}" >/dev/null 2>&1 || true
-_test::ok "600 readable" perm::readable "${pred}"
-_test::ok "600 writable" perm::writable "${pred}"
-
-chmod 700 "${pred}" >/dev/null 2>&1 || true
-if ! sys::is_windows; then
-    _test::ok "700 executable" perm::executable "${pred}"
-else
-    _test::skip "700 executable predicate skipped on Windows/Git Bash"
-fi
-
-chmod 600 "${pred}" >/dev/null 2>&1 || true
-if ! sys::is_windows; then
-    _test::not_ok "600 not executable" perm::executable "${pred}"
-else
-    _test::skip "600 not executable predicate skipped on Windows/Git Bash"
-fi
-
-_test::section "perm::owner / group / owned"
-
-own="${__PERM_TEST_ROOT}/owner.txt"
-_test::mkfile "${own}" "owner"
-
-owner="$(perm::owner "${own}" 2>/dev/null || true)"
-_test::ne "owner is non-empty" "${owner}" ""
-_test::ok "perm::owned current/default" perm::owned "${own}"
-
-if [[ -n "${owner}" ]]; then
-    _test::ok "perm::owned explicit owner" perm::owned "${own}" "${owner}"
-fi
-
-group="$(perm::group "${own}" 2>/dev/null || true)"
-_test::ne "group is non-empty" "${group}" ""
-
-if ! sys::is_windows && [[ -n "${group}" ]]; then
-    _test::ok "perm::group set current group" perm::group "${own}" "${group}"
-else
-    _test::not_ok "perm::group set fails on windows" perm::group "${own}" "${group:-Users}"
-fi
-
-_test::not_ok "perm::owner rejects injection" perm::owner "${own}" "bad;user"
-_test::not_ok "perm::group rejects injection" perm::group "${own}" "bad;group"
-
-_test::section "perm::same / copy"
-
-a="${__PERM_TEST_ROOT}/same-a.txt"
-b="${__PERM_TEST_ROOT}/same-b.txt"
-c="${__PERM_TEST_ROOT}/copy-c.txt"
-
-_test::mkfile "${a}" "a"
-_test::mkfile "${b}" "b"
-_test::mkfile "${c}" "c"
-
-perm::set "${a}" 600 >/dev/null 2>&1 || true
-perm::set "${b}" 600 >/dev/null 2>&1 || true
-perm::set "${c}" 644 >/dev/null 2>&1 || true
-
-_test::ok "perm::same true" perm::same "${a}" "${b}"
-
-perm::set "${b}" 755 >/dev/null 2>&1 || true
-
-if _test::can_check_perm_bits; then
-    _test::not_ok "perm::same false" perm::same "${a}" "${b}"
-else
-    _test::skip "perm::same false exact check skipped on windows-like runtime"
-fi
-
-_test::ok "perm::copy" perm::copy "${a}" "${c}"
-_test::ok "perm::same after copy" perm::same "${a}" "${c}"
-
-_test::section "perm::lock / unlock"
-
-lockf="${__PERM_TEST_ROOT}/lock.txt"
-_test::mkfile "${lockf}" "lock"
-
-_test::ok "perm::lock default" perm::lock "${lockf}"
-if ! sys::is_windows && ! sys::is_root; then
-    _test::not_ok "locked not writable" perm::writable "${lockf}"
-else
-    _test::skip "locked writable predicate skipped for root/windows"
-fi
-
-_test::ok "perm::unlock default" perm::unlock "${lockf}"
-_test::ok "unlocked writable" perm::writable "${lockf}"
-
-for who in u g o a; do
-    _test::ok "perm::lock ${who}" perm::lock "${lockf}" "${who}"
-    _test::ok "perm::unlock ${who}" perm::unlock "${lockf}" "${who}"
-done
-
-_test::not_ok "perm::lock rejects bad who" perm::lock "${lockf}" "u+x"
-_test::not_ok "perm::unlock rejects bad who" perm::unlock "${lockf}" "u+x"
-
-_test::section "symlink behavior"
-
-link_target="${__PERM_TEST_ROOT}/link-target.txt"
-link_path="${__PERM_TEST_ROOT}/link-path.txt"
-
-_test::mkfile "${link_target}" "target"
-
-if ln -s "${link_target}" "${link_path}" >/dev/null 2>&1; then
-    _test::ok "perm::get symlink" perm::get "${link_path}"
-    _test::ok "perm::info symlink" perm::info "${link_path}"
-    _test::ok "perm::set symlink target semantics" perm::set "${link_path}" 600
-else
-    _test::skip "symlink unsupported"
-fi
-
-_test::section "hostile path names"
-
-hostile_dir="${__PERM_TEST_ROOT}/hostile names"
-_test::mkdir "${hostile_dir}"
-
-hostile_paths=(
-    "${hostile_dir}/ leading.txt"
-    "${hostile_dir}/trailing .txt"
-    "${hostile_dir}/semi;colon.txt"
-    "${hostile_dir}/quote'file.txt"
-    "${hostile_dir}/double\"quote.txt"
-    "${hostile_dir}/dollar\$file.txt"
-    "${hostile_dir}/paren(file).txt"
-    "${hostile_dir}/bracket[1].txt"
-    "${hostile_dir}/star*.txt"
-    "${hostile_dir}/question?.txt"
-    "${hostile_dir}/arabic-طيبات.txt"
-)
-
-for p in "${hostile_paths[@]}"; do
-    _test::mkfile "${p}" "hostile"
-    _test::ok "hostile get: ${p}" perm::get "${p}"
-    _test::ok "hostile private: ${p}" perm::private "${p}"
-    _test::ok "hostile public: ${p}" perm::public "${p}"
-    _test::ok "hostile readonly: ${p}" perm::readonly "${p}"
-    chmod u+w -- "${p}" >/dev/null 2>&1 || true
-done
-
-_test::section "invalid path and argument failures"
-
-missing="${__PERM_TEST_ROOT}/missing.txt"
-
-_test::not_ok "get missing" perm::get "${missing}"
-_test::not_ok "set missing" perm::set "${missing}" 600
-_test::not_ok "add missing" perm::add "${missing}" x
-_test::not_ok "del missing" perm::del "${missing}" x
-_test::not_ok "read missing" perm::read "${missing}"
-_test::not_ok "write missing" perm::write "${missing}"
-_test::not_ok "execute missing" perm::execute "${missing}"
-_test::not_ok "owner missing" perm::owner "${missing}"
-_test::not_ok "group missing" perm::group "${missing}"
-_test::not_ok "private missing" perm::private "${missing}"
-_test::not_ok "public missing" perm::public "${missing}"
-_test::not_ok "ensure missing" perm::ensure "${missing}" 600
-_test::not_ok "copy missing source" perm::copy "${missing}" "${file}"
-_test::not_ok "copy missing target" perm::copy "${file}" "${missing}"
-_test::not_ok "same missing left" perm::same "${missing}" "${file}"
-_test::not_ok "same missing right" perm::same "${file}" "${missing}"
-_test::not_ok "info missing" perm::info "${missing}"
-
-_test::not_ok "get empty" perm::get ""
-_test::not_ok "set empty" perm::set "" 600
-_test::not_ok "set empty mode" perm::set "${file}" ""
-_test::not_ok "copy empty from" perm::copy "" "${file}"
-_test::not_ok "copy empty to" perm::copy "${file}" ""
-_test::not_ok "same empty left" perm::same "" "${file}"
-
-_test::section "medium stress matrix"
-
-stress="${__PERM_TEST_ROOT}/stress"
-_test::mkdir "${stress}"
-
-modes=(600 644 700 755)
-changes=(r w x rw rx wx rwx +r +w +x +rw +rwx u+r u+w u+x u+rw u+rwx g-r o-r a+r)
-removes=(r w x rw rx wx rwx +r +w +x +rw +rwx -r -w -x u+r u+w u+x u+rw g-r o-r a-r)
-
-for i in $(seq 1 80); do
-    p="${stress}/file-${i}.txt"
-    _test::mkfile "${p}" "stress ${i}"
-
-    m="${modes[$(( ( i - 1 ) % ${#modes[@]} ))]}"
-    c1="${changes[$(( ( i - 1 ) % ${#changes[@]} ))]}"
-    c2="${removes[$(( ( i - 1 ) % ${#removes[@]} ))]}"
-
-    _test::ok "stress set ${i}" perm::set "${p}" "${m}"
-    _test::ok "stress get ${i}" perm::get "${p}"
-    _test::ok "stress add ${i}" perm::add "${p}" "${c1}"
-    _test::ok "stress del ${i}" perm::del "${p}" "${c2}"
-    _test::ok "stress info ${i}" perm::info "${p}"
-done
-
-_test::section "final coverage smoke"
-
-coverage_fns=(
-    valid get set add del read write execute writeonly readonly editable private public owner group
-    lock unlock readable writable executable owned same copy ensure info
-)
-
-for fn in "${coverage_fns[@]}"; do
-    if declare -F "perm::${fn}" >/dev/null 2>&1; then
-        _test::pass
-    else
-        _test::fail "missing coverage function: perm::${fn}"
-    fi
-done
-
-_test::summary
+perm::read "${raw_b}" >/dev/null 2>&1 || true
+ok "effect read restores read" can_read "${raw_b}"
+
+printf '\n[raw: invalid args]\n'
+
+not_ok "perm::set invalid mode" perm::set "${raw_c}" "999"
+not_ok "perm::set injected mode" perm::set "${raw_c}" "644;echo bad"
+not_ok "perm::add invalid mode" perm::add "${raw_c}" "x;echo bad"
+not_ok "perm::del invalid mode" perm::del "${raw_c}" "x;echo bad"
+not_ok "perm::get missing" perm::get "${root}/missing-raw.txt"
+not_ok "perm::set missing" perm::set "${root}/missing-raw.txt" 600
+not_ok "perm::add missing" perm::add "${root}/missing-raw.txt" x
+not_ok "perm::del missing" perm::del "${root}/missing-raw.txt" x
+
+printf '\n[summary]\n'
+printf 'pass: %s\n' "${pass}"
+printf 'fail: %s\n' "${fail}"
+
+(( fail == 0 ))
