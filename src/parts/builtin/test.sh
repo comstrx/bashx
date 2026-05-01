@@ -245,10 +245,10 @@ printf "stdin:%s\n" "${value}" > "${out}"
 SH
 _expect_eq "user::lock stdin output" "stdin:ok" "$(cat "${TEST_ROOT}/user-lock-heredoc.out" 2>/dev/null || true)"
 
-_expect_ok "group::lock heredoc code mode" group::lock "__test_group_lock_heredoc" -- "${TEST_ROOT}/group-lock-heredoc.out" "ok" <<'SH'
+_expect_ok "group::lock stdin code mode" group::lock "__test_group_lock_stdin" --stdin "${TEST_ROOT}/group-lock-heredoc.out" "ok" <<'SH'
 out="${1:-}"
 value="${2:-}"
-printf "heredoc:%s\n" "${value}" > "${out}"
+printf "stdin:%s\n" "${value}" > "${out}"
 SH
 _expect_eq "group::lock stdin output" "stdin:ok" "$(cat "${TEST_ROOT}/group-lock-heredoc.out" 2>/dev/null || true)"
 
