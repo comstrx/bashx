@@ -167,20 +167,20 @@ printf '[env] os=%s runtime=%s user=%s group=%s mutate=%s\n' \
 
 _section "api presence"
 for fn in \
-    user::valid user::lock user::id user::name user::exists user::add user::del user::all user::groups user::add_group user::del_group user::group user::home user::shell user::is_root user::is_admin user::can_sudo \
-    group::valid group::lock group::id group::name group::exists group::add group::del group::all group::users group::add_user group::del_user
+    user::valid user::lock user::locked user::id user::name user::exists user::add user::del user::all user::groups user::add_group user::del_group user::group user::home user::shell user::is_root user::is_admin user::can_sudo \
+    group::valid group::lock group::locked group::id group::name group::exists group::add group::del group::all group::users group::add_user group::del_user
 do
     if declare -F "${fn}" >/dev/null 2>&1; then _pass "function exists: ${fn}"; else _fail "missing function: ${fn}"; fi
 done
 
 api_count=0
 for fn in \
-    user::valid user::lock user::id user::name user::exists user::add user::del user::all user::groups user::add_group user::del_group user::group user::home user::shell user::is_root user::is_admin user::can_sudo \
-    group::valid group::lock group::id group::name group::exists group::add group::del group::all group::users group::add_user group::del_user
+    user::valid user::lock user::locked user::id user::name user::exists user::add user::del user::all user::groups user::add_group user::del_group user::group user::home user::shell user::is_root user::is_admin user::can_sudo \
+    group::valid group::lock group::locked group::id group::name group::exists group::add group::del group::all group::users group::add_user group::del_user
 do
     declare -F "${fn}" >/dev/null 2>&1 && api_count=$(( api_count + 1 ))
 done
-_expect_eq "api count is 28" "28" "${api_count}"
+_expect_eq "api count is 30" "30" "${api_count}"
 
 _section "validation API"
 for s in "${CURRENT_USER}" "${CURRENT_GROUP}" "${TEST_USER_A}" "${TEST_GROUP_A}" "abc_123" "abc-123"; do
@@ -261,6 +261,37 @@ mkdir -p -- "${TMPDIR:-/tmp}/bash-permissions-locks/__test_group_stale.lock" >/d
 printf '999999999\n' > "${TMPDIR:-/tmp}/bash-permissions-locks/__test_group_stale.lock/pid" 2>/dev/null || true
 _expect_ok "group::lock clears stale lock" group::lock "__test_group_stale" _lock_fn_ok "${TEST_ROOT}/group-lock-stale.out" "ok"
 _expect_eq "group::lock stale output" "fn:ok" "$(cat "${TEST_ROOT}/group-lock-stale.out" 2>/dev/null || true)"
+
+_section "locked API standalone"
+LOCK_ROOT="${TMPDIR:-/tmp}/bash-permissions-locks"
+rm -rf -- "${LOCK_ROOT}/__test_user_locked_absent.lock" "${LOCK_ROOT}/__test_group_locked_absent.lock" >/dev/null 2>&1 || true
+_expect_fail "user::locked absent lock fails" user::locked "__test_user_locked_absent"
+_expect_fail "group::locked absent lock fails" group::locked "__test_group_locked_absent"
+_expect_fail "user::locked rejects invalid empty" user::locked ""
+_expect_fail "user::locked rejects invalid wildcard" user::locked "*"
+_expect_fail "group::locked rejects invalid empty" group::locked ""
+_expect_fail "group::locked rejects invalid wildcard" group::locked "*"
+
+mkdir -p -- "${LOCK_ROOT}/__test_user_locked_active.lock" "${LOCK_ROOT}/__test_group_locked_active.lock" >/dev/null 2>&1 || true
+printf '%s\n' "$$" > "${LOCK_ROOT}/__test_user_locked_active.lock/pid"
+printf '%s\n' "$$" > "${LOCK_ROOT}/__test_group_locked_active.lock/pid"
+_expect_ok "user::locked active pid" user::locked "__test_user_locked_active"
+_expect_ok "group::locked active pid" group::locked "__test_group_locked_active"
+rm -rf -- "${LOCK_ROOT}/__test_user_locked_active.lock" "${LOCK_ROOT}/__test_group_locked_active.lock" >/dev/null 2>&1 || true
+
+mkdir -p -- "${LOCK_ROOT}/__test_user_locked_pidless.lock" "${LOCK_ROOT}/__test_group_locked_pidless.lock" >/dev/null 2>&1 || true
+rm -f -- "${LOCK_ROOT}/__test_user_locked_pidless.lock/pid" "${LOCK_ROOT}/__test_group_locked_pidless.lock/pid" >/dev/null 2>&1 || true
+_expect_ok "user::locked pidless conservative locked" user::locked "__test_user_locked_pidless"
+_expect_ok "group::locked pidless conservative locked" group::locked "__test_group_locked_pidless"
+rm -rf -- "${LOCK_ROOT}/__test_user_locked_pidless.lock" "${LOCK_ROOT}/__test_group_locked_pidless.lock" >/dev/null 2>&1 || true
+
+mkdir -p -- "${LOCK_ROOT}/__test_user_locked_stale.lock" "${LOCK_ROOT}/__test_group_locked_stale.lock" >/dev/null 2>&1 || true
+printf '999999999\n' > "${LOCK_ROOT}/__test_user_locked_stale.lock/pid"
+printf '999999999\n' > "${LOCK_ROOT}/__test_group_locked_stale.lock/pid"
+_expect_fail "user::locked stale pid fails" user::locked "__test_user_locked_stale"
+_expect_fail "group::locked stale pid fails" group::locked "__test_group_locked_stale"
+if [[ -d "${LOCK_ROOT}/__test_user_locked_stale.lock" ]]; then _fail "user::locked stale dir removed"; else _pass "user::locked stale dir removed"; fi
+if [[ -d "${LOCK_ROOT}/__test_group_locked_stale.lock" ]]; then _fail "group::locked stale dir removed"; else _pass "group::locked stale dir removed"; fi
 
 _section "current identity reads"
 _expect_nonempty "user::name nonempty" "${CURRENT_USER}"
@@ -477,6 +508,7 @@ _section "hostile input sweep"
 for bad in "*" "?" "[abc]" "bad/name" 'bad\name' '$USER' '$(id)' ';true' $'x\ny' $'x\ry'; do
     _expect_fail "user::valid hostile ${bad}" user::valid "${bad}"
     _expect_fail "user::lock hostile ${bad}" user::lock "${bad}" _lock_fn_ok "${TEST_ROOT}/nope"
+    _expect_fail "user::locked hostile ${bad}" user::locked "${bad}"
     _expect_fail "user::exists hostile ${bad}" user::exists "${bad}"
     _expect_fail "user::id hostile ${bad}" user::id "${bad}"
     _expect_fail "user::group hostile ${bad}" user::group "${bad}"
@@ -485,6 +517,7 @@ for bad in "*" "?" "[abc]" "bad/name" 'bad\name' '$USER' '$(id)' ';true' $'x\ny'
     _expect_fail "user::groups hostile ${bad}" user::groups "${bad}"
     _expect_fail "group::valid hostile ${bad}" group::valid "${bad}"
     _expect_fail "group::lock hostile ${bad}" group::lock "${bad}" _lock_fn_ok "${TEST_ROOT}/nope"
+    _expect_fail "group::locked hostile ${bad}" group::locked "${bad}"
     _expect_fail "group::exists hostile ${bad}" group::exists "${bad}"
     _expect_fail "group::id hostile ${bad}" group::id "${bad}"
     _expect_fail "group::users hostile ${bad}" group::users "${bad}"
@@ -511,6 +544,7 @@ _section "minimal PATH graceful failure"
 _section "api coverage gate"
 covered_functions="user::valid
 user::lock
+user::locked
 user::id
 user::name
 user::exists
@@ -528,6 +562,7 @@ user::is_admin
 user::can_sudo
 group::valid
 group::lock
+group::locked
 group::id
 group::name
 group::exists
@@ -537,7 +572,7 @@ group::all
 group::users
 group::add_user
 group::del_user"
-_expect_eq "documented coverage count" "28" "$(printf '%s\n' "${covered_functions}" | awk 'NF { n++ } END { print n + 0 }')"
+_expect_eq "documented coverage count" "30" "$(printf '%s\n' "${covered_functions}" | awk 'NF { n++ } END { print n + 0 }')"
 for fn in ${covered_functions}; do
     if declare -F "${fn}" >/dev/null 2>&1; then _pass "covered: ${fn}"; else _fail "coverage missing function: ${fn}"; fi
 done

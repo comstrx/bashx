@@ -49,6 +49,7 @@ user::lock () {
         if [[ $# -gt 0 && "${1:-}" == *$'\n'* ]]; then
             code="${1}"
             shift
+
             command bash -c "${code}" _ "$@"
             rc=$?
         else
@@ -65,6 +66,27 @@ user::lock () {
 
     rm -rf -- "${lock}" >/dev/null 2>&1 || true
     return "${rc}"
+
+}
+user::locked () {
+
+    local name="${1:-}" root="" lock="" pid="" old=""
+
+    user::valid "${name}" || return 1
+
+    root="${TMPDIR:-/tmp}/bash-permissions-locks"
+    lock="${root}/${name}.lock"
+    pid="${lock}/pid"
+
+    [[ -d "${lock}" ]] || return 1
+
+    [[ -r "${pid}" ]] && { IFS= read -r old < "${pid}" || true; }
+    [[ "${old}" =~ ^[0-9]+$ ]] || return 0
+
+    kill -0 "${old}" 2>/dev/null && return 0
+    rm -rf -- "${lock}" >/dev/null 2>&1 || true
+
+    return 1
 
 }
 user::id () {
@@ -977,6 +999,11 @@ group::lock () {
     user::lock "$@"
 
 }
+group::locked () {
+
+    user::locked "$@"
+
+}
 group::id () {
 
     local group="${1:-}" v=""
@@ -1322,6 +1349,7 @@ group::all () {
                 )"
 
                 [[ -n "${v}" ]] || return 1
+
                 printf '%s\n' "${v}"
                 return 0
 
@@ -1340,6 +1368,7 @@ group::all () {
             ' | awk 'NF && !seen[$0]++ { print }' || true)"
 
             [[ -n "${v}" ]] || return 1
+
             printf '%s\n' "${v}"
             return 0
 
@@ -1386,6 +1415,7 @@ group::all () {
 
         sys::has dscl || return 1
         dscl . -list /Groups 2>/dev/null | awk 'NF && !seen[$0]++ { print }'
+
         return
 
     fi
