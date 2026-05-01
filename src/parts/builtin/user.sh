@@ -350,9 +350,23 @@ user::add () {
             # shellcheck disable=SC2016
             SYS_USER_QUERY="${user}" SYS_GROUP_QUERY="${group}" powershell.exe -NoProfile -NonInteractive -Command '
                 try {
-                    $p = ConvertTo-SecureString "" -AsPlainText -Force
-                    New-LocalUser -Name $env:SYS_USER_QUERY -Password $p -ErrorAction Stop | Out-Null
-                    try { Add-LocalGroupMember -Group $env:SYS_GROUP_QUERY -Member $env:SYS_USER_QUERY -ErrorAction Stop } catch {}
+                    $name  = $env:SYS_USER_QUERY
+                    $group = $env:SYS_GROUP_QUERY
+                    $pass  = [Guid]::NewGuid().ToString("N") + "aA1!"
+
+                    $secure = ConvertTo-SecureString $pass -AsPlainText -Force
+
+                    New-LocalUser `
+                        -Name $name `
+                        -Password $secure `
+                        -PasswordNeverExpires `
+                        -AccountNeverExpires `
+                        -ErrorAction Stop | Out-Null
+
+                    try {
+                        Add-LocalGroupMember -Group $group -Member $name -ErrorAction Stop
+                    } catch {}
+
                     exit 0
                 } catch {
                     exit 1
@@ -363,9 +377,15 @@ user::add () {
 
         fi
         if sys::has net.exe; then
-            net.exe user "${user}" "" /add >/dev/null 2>&1 || return 1
+
+            local pass=""
+            pass="Bx$(date +%s)${RANDOM}aA1!"
+
+            net.exe user "${user}" "${pass}" /add >/dev/null 2>&1 || return 1
             net.exe localgroup "${group}" "${user}" /add >/dev/null 2>&1 || true
+
             return 0
+
         fi
 
         return 1
