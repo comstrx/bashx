@@ -861,6 +861,12 @@ group::id () {
         [[ "${v}" =~ ^[0-9]+$ ]] && { printf '%s\n' "${v}"; return 0; }
 
     fi
+    if sys::is_macos && sys::has dscl; then
+
+        v="$(dscl . -read "/Groups/${group}" PrimaryGroupID 2>/dev/null | awk 'NR == 1 { print $2 }')"
+        [[ "${v}" =~ ^[0-9]+$ ]] && { printf '%s\n' "${v}"; return 0; }
+
+    fi
     if sys::has getent; then
 
         v="$(getent group "${group}" 2>/dev/null | awk -F: 'NR == 1 { print $3 }')"
