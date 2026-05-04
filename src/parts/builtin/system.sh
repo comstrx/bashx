@@ -607,7 +607,7 @@ sys::arch () {
         ppc64)                    printf '%s\n' "ppc64" ;;
         s390x)                    printf '%s\n' "s390x" ;;
         riscv64)                  printf '%s\n' "riscv64" ;;
-        *)                        printf '%s\n' "${v}" ;;
+        *)                        printf '%s\n' "${lower}" ;;
     esac
 
 }
