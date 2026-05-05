@@ -1,18 +1,24 @@
 
-__enter__ () {
+__inner_enter__ () {
 
-    __trace__
+    __inner_trace__
 
-    local cmd="${1:-}"
-    shift || true
-
-    case "${cmd}" in
-        --test)  __test__ "$@" ;;
-        --tests) __tests__ "$@" ;;
-        *)       main "$@" ;;
+    case "${1:-}" in
+        --test)
+            shift || true
+            __inner_test__ "$@"
+        ;;
+        --tests)
+            shift || true
+            __inner_tests__ "$@"
+        ;;
+        *)
+            "${__INNER_APP_ENTRY__}" "$@"
+        ;;
     esac
 
 }
 
-__enter__ "$@"
-exit $?
+__inner_enter__ "$@" || __INNER_APP_CODE__=$?
+
+exit "${__INNER_APP_CODE__}"

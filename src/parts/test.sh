@@ -1,33 +1,44 @@
 
-__test_resolve__ () {
+__inner_test_resolve__ () {
 
     local want="${1:-}"
 
     [[ -n "${want}" ]] || return 1
-    [[ -n "${__APP_TEST_MAP__[${want}]:-}" ]] || return 1
+    [[ -n "${__INNER_TEST_MAP__[${want}]:-}" ]] || return 1
 
-    printf '%s\n' "${__APP_TEST_MAP__[${want}]}"
+    printf '%s\n' "${__INNER_TEST_MAP__[${want}]}"
 
 }
-__test_run__ () {
+__inner_test_one__ () {
+
+    local fn="${1:-}"
+    [[ -n "${fn}" ]] || return 1
+
+    shift || true
+    printf '==> %s\n' "${fn}"
+
+    if "${fn}" "$@"; then
+        printf '[PASS]: %s\n\n' "${fn}"
+        return 0
+    fi
+
+    printf '[FAIL]: %s\n\n' "${fn}" >&2
+    return 1
+
+}
+__inner_test_run__ () {
 
     local fn="" rc=0 pass=0 fail=0
     local -a tests=( "$@" )
 
     for fn in "${tests[@]}"; do
 
-        printf '==> %s\n' "${fn}"
-
-        if "${fn}" 2>/dev/null; then
-            printf '[PASS]: %s\n' "${fn}"
+        if __inner_test_one__ "${fn}"; then
             (( ++pass ))
         else
-            printf '[FAIL]: %s\n' "${fn}" >&2
             (( ++fail ))
             rc=1
         fi
-
-        printf '\n'
 
     done
 
@@ -35,42 +46,33 @@ __test_run__ () {
     return "${rc}"
 
 }
-__test__ () {
+__inner_test__ () {
 
     local target="" resolved=""
 
     if (( $# == 0 )); then
-        __test_run__ "${__APP_TESTS_LIST__[@]}"
+        __inner_test_run__ "${__INNER_TEST_LIST__[@]}"
         return $?
     fi
 
-    target="${1:-}"
+    target="${1}"
     shift || true
 
-    if ! resolved="$(__test_resolve__ "${target}" 2>/dev/null)"; then
+    if ! resolved="$(__inner_test_resolve__ "${target}")"; then
         printf '[FAIL]: test not found: %s\n' "${target}" >&2
         printf '[INFO]: total=1 pass=0 fail=1\n' >&2
         return 1
     fi
 
-    printf '==> %s\n' "${resolved}"
-
-    if "${resolved}" "$@" 2>/dev/null; then
-        printf '[PASS]: %s\n\n' "${resolved}"
-        printf '[INFO]: total=1 pass=1 fail=0\n'
-        return 0
-    fi
-
-    printf '[FAIL]: %s\n\n' "${resolved}" >&2
-    printf '[INFO]: total=1 pass=0 fail=1\n' >&2
-    return 1
+    __inner_test_one__ "${resolved}" "$@"
+    return $?
 
 }
-__tests__ () {
+__inner_tests__ () {
 
     local fn=""
 
-    for fn in "${__APP_TESTS_LIST__[@]}"; do
+    for fn in "${__INNER_TEST_LIST__[@]}"; do
         printf '%s\n' "${fn}"
     done
 
