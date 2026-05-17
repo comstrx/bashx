@@ -15,6 +15,61 @@ declare -a APP_SRCS=()
 declare -a APP_TESTS=()
 declare -a APP_TEMPS=()
 
+declare -a APP_STDS=()
+declare -A APP_STD_STATE=()
+
+declare -a APP_STD_BASIC=(
+    arch
+    base
+    cast
+)
+declare -A APP_STD_LIB=(
+    [crypto]="crypto"
+    [date]="date"
+    [dir]="dir"
+    [env]="env"
+    [file]="file"
+    [hook]="hook"
+    [input]="input"
+    [list]="list"
+    [log]="log"
+    [map]="map"
+    [net]="network"
+    [job]="parallel"
+    [parse]="parse"
+    [path]="path"
+    [perm]="perm"
+    [proc]="process"
+    [svc]="service"
+    [str]="string"
+    [sys]="system"
+    [tool]="tool"
+    [user]="user"
+)
+declare -A APP_STD_DEPS=(
+    [crypto]=""
+    [date]=""
+    [dir]="path"
+    [env]=""
+    [file]="path"
+    [hook]=""
+    [input]=""
+    [list]=""
+    [log]=""
+    [map]=""
+    [net]=""
+    [job]="proc"
+    [parse]="str,list,map"
+    [path]=""
+    [perm]="user,sys"
+    [proc]="sys"
+    [svc]="sys,proc"
+    [str]=""
+    [sys]=""
+    [tool]="sys,proc,path,file"
+    [user]="sys"
+)
+
 color () {
 
     local code="${1:-}" text="${2:-}"
