@@ -36,4 +36,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run test
-        run: bash src/parts/builtin/test.sh
+        run: bash src/std/test.sh
